@@ -1,0 +1,22 @@
+<idea-plugin>
+    <id>com.example.minecraftoauth</id>
+    <name>Minecraft OAuth Plugin</name>
+    <version>1.0</version>
+    <vendor email="tgtggamesyt.dev" url="https://tggamesyt.dev">TGdoesCode</vendor>
+
+    <depends>com.demonwav.minecraft-dev</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectConfigurable
+                instance="dev.tggamesyt.MinecraftOAuthConfigurable"/>
+        <applicationService
+                serviceImplementation="dev.tggamesyt.MinecraftAccountsState"/>
+    </extensions>
+
+    <actions>
+        <action id="MinecraftOAuthLoginAction"
+                class="dev.tggamesyt.MinecraftOAuthLoginAction"
+                text="Login to Minecraft"
+                description="Login with Microsoft for premium Minecraft"/>
+    </actions>
+</idea-plugin>

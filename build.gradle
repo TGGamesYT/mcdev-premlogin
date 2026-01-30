@@ -1,0 +1,66 @@
+import java.lang.module.ModuleDescriptor
+
+plugins {
+    id 'java'
+    id 'org.jetbrains.intellij.platform' version '2.11.0'
+}
+
+group 'dev.tggamesyt'
+version '1.1'
+
+repositories {
+    mavenCentral()
+
+    intellijPlatform {
+        defaultRepositories()  // Required to resolve IntelliJ SDK + bundled plugins
+        marketplace()
+    }
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+// ===== IntelliJ Platform dependencies =====
+dependencies {
+    intellijPlatform {
+        // Target IntelliJ IDEA version
+        intellijIdea '2025.3.1.1'
+
+        // Bundled plugins
+        bundledPlugin 'com.intellij.java'
+
+        // Minecraft Development plugin from Marketplace
+        plugin 'com.demonwav.minecraft-dev', '2025.3-1.8.11'
+    }
+
+    // Your libraries
+    implementation 'com.fasterxml.jackson.core:jackson-databind:2.16.2'
+    implementation 'com.squareup.okhttp3:okhttp:5.0.0-alpha.11'
+    implementation 'org.json:json:20230618'
+    // Testing
+    testImplementation platform('org.junit:junit-bom:5.10.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+tasks.test {
+    useJUnitPlatform()
+}
+tasks {
+    patchPluginXml {
+        pluginDescription.set(file("src/main/resources/META-INF/plugin.xml").text)
+        changeNotes.set("Initial release")
+    }
+
+    buildPlugin {
+        archiveBaseName.set("mcdev-premlogin")
+        archiveVersion.set(version)
+        destinationDirectory.set(file("$buildDir/distributions"))
+    }
+}
