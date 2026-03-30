@@ -14,7 +14,9 @@ public class MinecraftOAuthConfigurable implements Configurable {
 
     private final JPanel panel;
     private final JComboBox<String> accountBox;
-    private final JTextField runConfigDirField;
+    private final JTextField runConfigNameField;
+    private boolean updatingAccountBox = false;
+    private Timer refreshTimer;
 
     private final MinecraftOAuthManager manager = new MinecraftOAuthManager();
     private final MinecraftAccountsState state = MinecraftAccountsState.getInstance();
@@ -27,6 +29,7 @@ public class MinecraftOAuthConfigurable implements Configurable {
         // --- Account dropdown ---
         accountBox = new JComboBox<>();
         accountBox.addActionListener(e -> {
+            if (updatingAccountBox) return; // ignore events fired during refresh
             int idx = accountBox.getSelectedIndex();
             if (idx >= 0 && idx < state.accounts.size()) {
                 state.selectedAccountId = state.accounts.get(idx).id;
@@ -34,18 +37,17 @@ public class MinecraftOAuthConfigurable implements Configurable {
             }
         });
 
-        // --- RunConfigurations directory input ---
-        JLabel runConfigLabel = new JLabel("<html>If you move the runConfigurations directory,<br>update this field to match the new location,<br>or Minecraft_Client.xml will not be found.</html>");
-        runConfigDirField = new JTextField(getDefaultRunConfigDir(), 40);
-        runConfigDirField.addActionListener(e -> updateRunConfigFile());
+        // --- Run configuration name input ---
+        JLabel runConfigLabel = new JLabel("Run configuration name:");
+        runConfigNameField = new JTextField("Minecraft Client", 30);
+        runConfigNameField.addActionListener(e -> updateRunConfigName());
 
-        // Use BoxLayout to prevent stretching vertically
         JPanel runConfigPanel = new JPanel();
         runConfigPanel.setLayout(new BoxLayout(runConfigPanel, BoxLayout.Y_AXIS));
         runConfigPanel.add(runConfigLabel);
 
         JPanel fieldWrapper = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-        fieldWrapper.add(runConfigDirField);
+        fieldWrapper.add(runConfigNameField);
         runConfigPanel.add(fieldWrapper);
 
         // --- Buttons panel ---
@@ -57,6 +59,11 @@ public class MinecraftOAuthConfigurable implements Configurable {
         panel.add(buttons, BorderLayout.SOUTH);
 
         refreshAccounts();
+
+        // Refresh account status every 60 seconds
+        refreshTimer = new Timer(60_000, e -> refreshAccounts());
+        refreshTimer.setRepeats(true);
+        refreshTimer.start();
     }
 
     private @NotNull JPanel getButtonsPanel() {
@@ -121,22 +128,30 @@ public class MinecraftOAuthConfigurable implements Configurable {
     }
 
     private void refreshAccounts() {
-        MinecraftRunConfigUpdater.updateArgs(); // auto-update args
-
-        // remember currently selected account
         String selectedId = state.selectedAccountId;
 
-        accountBox.removeAllItems();
-        int selectedIndex = -1;
-        for (int i = 0; i < state.accounts.size(); i++) {
-            MinecraftAccount acc = state.accounts.get(i);
-            accountBox.addItem(acc.username + " (" + acc.type + ")");
-            if (acc.id.equals(selectedId)) selectedIndex = i;
+        updatingAccountBox = true;
+        try {
+            accountBox.removeAllItems();
+            int selectedIndex = -1;
+            for (int i = 0; i < state.accounts.size(); i++) {
+                MinecraftAccount acc = state.accounts.get(i);
+                String label = acc.username + " (" + acc.type + ")";
+                if (acc.isExpired()) {
+                    label = acc.username + " (EXPIRED - RE-LOGIN REQUIRED)";
+                }
+                accountBox.addItem(label);
+                if (acc.id.equals(selectedId)) selectedIndex = i;
+            }
+
+            if (selectedIndex >= 0) {
+                accountBox.setSelectedIndex(selectedIndex);
+            }
+        } finally {
+            updatingAccountBox = false;
         }
 
-        if (selectedIndex >= 0) {
-            accountBox.setSelectedIndex(selectedIndex);
-        }
+        MinecraftRunConfigUpdater.updateArgs();
     }
 
     private MinecraftAccount getSelectedAccount() {
@@ -145,17 +160,12 @@ public class MinecraftOAuthConfigurable implements Configurable {
         return state.accounts.get(index);
     }
 
-    /** Returns the default runConfigurations directory for the current project */
-    private String getDefaultRunConfigDir() {
-        return project.getBasePath() + "/.idea/runConfigurations";
-    }
-
-    /** Called whenever the user changes the runConfigDirField */
-    private void updateRunConfigFile() {
-        String dir = runConfigDirField.getText().trim();
-        if (!dir.isEmpty()) {
-            MinecraftRunConfigUpdater.setConfigFile(dir + "/Minecraft_Client.xml");
-            MinecraftRunConfigUpdater.updateArgs(); // immediately update VM args
+    /** Called whenever the user changes the run config name field */
+    private void updateRunConfigName() {
+        String name = runConfigNameField.getText().trim();
+        if (!name.isEmpty()) {
+            MinecraftRunConfigUpdater.setConfigName(name);
+            MinecraftRunConfigUpdater.updateArgs();
         }
     }
 
@@ -178,4 +188,12 @@ public class MinecraftOAuthConfigurable implements Configurable {
 
     @Override
     public void apply() {}
+
+    @Override
+    public void disposeUIResources() {
+        if (refreshTimer != null) {
+            refreshTimer.stop();
+            refreshTimer = null;
+        }
+    }
 }

@@ -1,18 +1,15 @@
 package dev.tggamesyt;
 
-import org.jdom.Document;
-import org.jdom.Element;
-import org.jdom.input.SAXBuilder;
-import org.jdom.output.Format;
-import org.jdom.output.XMLOutputter;
+import com.intellij.execution.RunManager;
+import com.intellij.execution.RunnerAndConfigurationSettings;
+import com.intellij.execution.configurations.RunConfiguration;
+import com.intellij.openapi.project.Project;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.lang.reflect.Method;
 import java.util.regex.Pattern;
 
 public class MinecraftRunConfigUpdater {
 
-    // Pattern to remove old Minecraft args (username, uuid, accessToken, userType)
     private static final Pattern MC_ARGS_PATTERN = Pattern.compile(
             "(--username\\s+\\S+)|" +
                     "(--uuid\\s+\\S+)|" +
@@ -20,26 +17,19 @@ public class MinecraftRunConfigUpdater {
                     "(--userType\\s+\\S+)"
     );
 
-    // The current Minecraft_Client.xml file to update
-    private static File configFile = new File(
-            MinecraftOAuthConfigurable.project.getBasePath(),
-            ".idea/runConfigurations/Minecraft_Client.xml"
-    );
+    private static String configName = "Minecraft Client";
 
-    /** Sets a new Minecraft_Client.xml file (called from settings panel) */
-    public static void setConfigFile(String path) {
-        configFile = new File(path);
+    public static void setConfigName(String name) {
+        configName = name;
     }
 
     /**
-     * Updates the Minecraft Client run configuration with the currently selected account.
-     * Automatically removes old Minecraft args to prevent duplicates.
+     * Updates the Minecraft Client run configuration with the currently selected account
+     * using IntelliJ's RunManager API for reliable persistence.
      */
     public static void updateArgs() {
-        if (configFile == null || !configFile.exists()) {
-            System.err.println("Minecraft run configuration file not found: " + configFile);
-            return;
-        }
+        Project project = MinecraftOAuthConfigurable.project;
+        if (project == null) return;
 
         try {
             MinecraftAccountsState state = MinecraftAccountsState.getInstance();
@@ -48,47 +38,75 @@ public class MinecraftRunConfigUpdater {
                     .findFirst()
                     .orElse(null);
 
-            if (acc == null) return; // nothing selected
+            if (acc == null) return;
 
-            SAXBuilder builder = new SAXBuilder();
-            Document doc = builder.build(configFile);
-            Element root = doc.getRootElement(); // <component>
+            RunManager runManager = RunManager.getInstance(project);
 
-            for (Element config : root.getChildren("configuration")) {
-                String name = config.getAttributeValue("name");
-                if (!"Minecraft Client".equals(name)) continue;
+            for (RunnerAndConfigurationSettings settings : runManager.getAllSettings()) {
+                RunConfiguration config = settings.getConfiguration();
+                if (!configName.equals(config.getName())) continue;
 
-                for (Element option : config.getChildren("option")) {
-                    if (!"PROGRAM_PARAMETERS".equals(option.getAttributeValue("name"))) continue;
-
-                    String args = option.getAttributeValue("value", "");
-                    // Remove old MC-specific args
-                    args = MC_ARGS_PATTERN.matcher(args).replaceAll("").trim();
-
-                    // Append new args for selected account
-                    if (acc.type == MinecraftAccount.Type.CRACKED) {
-                        args += " --username " + acc.username;
-                    } else {
-                        if (acc.isExpired()) throw new RuntimeException("Minecraft session expired. Re-login required.");
-                        args += " --username " + acc.username;
-                        args += " --uuid " + acc.uuid;
-                        args += " --accessToken " + acc.accessToken;
-                        args += " --userType msa";
+                // Get current program parameters via reflection,
+                // since the minecraft-dev plugin's config type may not be on our compile classpath
+                String args = "";
+                Method getter = findMethod(config.getClass(), "getProgramParameters");
+                if (getter != null) {
+                    getter.setAccessible(true);
+                    Object result = getter.invoke(config);
+                    if (result instanceof String) {
+                        args = (String) result;
                     }
-
-                    option.setAttribute("value", args.trim());
                 }
+
+                // Remove old MC-specific args
+                args = MC_ARGS_PATTERN.matcher(args).replaceAll("").trim();
+
+                // Append new args for selected account
+                if (acc.type == MinecraftAccount.Type.CRACKED) {
+                    args += " --username " + acc.username;
+                } else {
+                    if (acc.isExpired()) throw new RuntimeException("Minecraft session expired. Re-login required.");
+                    args += " --username " + acc.username;
+                    args += " --uuid " + acc.uuid;
+                    args += " --accessToken " + acc.accessToken;
+                    args += " --userType msa";
+                }
+
+                args = args.trim();
+
+                // Set the updated parameters via reflection
+                Method setter = findMethod(config.getClass(), "setProgramParameters", String.class);
+                if (setter != null) {
+                    setter.setAccessible(true);
+                    setter.invoke(config, args);
+                }
+
+                // Tell RunManager to persist the change
+                runManager.makeStable(settings);
+                return;
             }
 
-            // Save XML back
-            try (FileOutputStream fos = new FileOutputStream(configFile)) {
-                XMLOutputter xmlOut = new XMLOutputter();
-                xmlOut.setFormat(Format.getPrettyFormat());
-                xmlOut.output(doc, fos);
-            }
+            System.err.println("Run configuration '" + configName + "' not found.");
 
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /** Walks the class hierarchy to find a method by name and parameter types. */
+    private static Method findMethod(Class<?> clazz, String name, Class<?>... paramTypes) {
+        while (clazz != null) {
+            try {
+                return clazz.getDeclaredMethod(name, paramTypes);
+            } catch (NoSuchMethodException e) {
+                for (Class<?> iface : clazz.getInterfaces()) {
+                    try {
+                        return iface.getDeclaredMethod(name, paramTypes);
+                    } catch (NoSuchMethodException ignored) {}
+                }
+                clazz = clazz.getSuperclass();
+            }
+        }
+        return null;
     }
 }
