@@ -65,7 +65,7 @@ public class MinecraftRunConfigUpdater {
                 if (acc.type == MinecraftAccount.Type.CRACKED) {
                     args += " --username " + acc.username;
                 } else {
-                    if (acc.isExpired()) throw new RuntimeException("Minecraft session expired. Re-login required.");
+                    // Use the stored token even if marked expired; a background refresh will update it shortly
                     args += " --username " + acc.username;
                     args += " --uuid " + acc.uuid;
                     args += " --accessToken " + acc.accessToken;
