@@ -41,3 +41,11 @@ jobs:
           name: ${{ steps.version.outputs.version }}
           files: ${{ steps.zip.outputs.path }}
           generate_release_notes: true
+
+      - name: Upload to JetBrains Marketplace
+        run: |
+          curl -i --fail \
+            --header "Authorization: Bearer ${{ secrets.Jetbrains }}" \
+            -F "xmlId=dev.tggamesyt.mcdev-premlogin" \
+            -F "file=@${{ steps.zip.outputs.path }}" \
+            https://plugins.jetbrains.com/api/updates/upload
