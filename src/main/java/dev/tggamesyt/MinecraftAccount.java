@@ -17,9 +17,14 @@ public class MinecraftAccount {
     public String uuid;        // null for cracked
     public String accessToken; // null for cracked
 
-    public long expiresAt;     // millis, 0 for cracked
+    public long expiresAt;      // millis, 0 for cracked
+    public String msRefreshToken; // Microsoft refresh token; null for cracked
 
     public boolean isExpired() {
         return type == Type.PREMIUM && System.currentTimeMillis() > expiresAt;
+    }
+
+    public boolean canRefresh() {
+        return type == Type.PREMIUM && msRefreshToken != null;
     }
 }

@@ -1,8 +1,22 @@
 <idea-plugin>
     <id>dev.tggamesyt.mcdev-premlogin</id>
     <name>Minecraft OAuth</name>
-    <version>1.2</version>
+    <version>1.3</version>
     <vendor email="tgtggamesyt.dev" url="https://tggamesyt.dev">TGdoesCode</vendor>
+
+    <description><![CDATA[
+        Companion plugin for the Minecraft Dev plugin that lets you authenticate with a
+        Microsoft (premium) account or set a cracked username before launching the Minecraft
+        client from an IntelliJ run configuration.<br><br>
+        Features:<br>
+        <ul>
+          <li>Microsoft OAuth 2.0 login with PKCE (premium accounts)</li>
+          <li>Cracked / offline username support</li>
+          <li>Silent background token refresh — no re-login needed after everyday inactivity</li>
+          <li>Automatically wires up the Minecraft Client run configuration in new projects</li>
+          <li>Multiple account support with per-project run configuration name override</li>
+        </ul>
+    ]]></description>
 
     <depends>com.demonwav.minecraft-dev</depends>
 
@@ -11,6 +25,8 @@
                 instance="dev.tggamesyt.MinecraftOAuthConfigurable"/>
         <applicationService
                 serviceImplementation="dev.tggamesyt.MinecraftAccountsState"/>
+        <postStartupActivity
+                implementation="dev.tggamesyt.MinecraftProjectStartupActivity"/>
     </extensions>
 
     <actions>

@@ -1,5 +1,6 @@
 package dev.tggamesyt;
 
+import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.options.Configurable;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.ui.Messages;
@@ -9,6 +10,8 @@ import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import java.awt.*;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class MinecraftOAuthConfigurable implements Configurable {
 
@@ -20,6 +23,7 @@ public class MinecraftOAuthConfigurable implements Configurable {
 
     private final MinecraftOAuthManager manager = new MinecraftOAuthManager();
     private final MinecraftAccountsState state = MinecraftAccountsState.getInstance();
+    private final Set<String> refreshingIds = ConcurrentHashMap.newKeySet();
     static Project project = null;
 
     public MinecraftOAuthConfigurable(Project project) {
@@ -136,9 +140,25 @@ public class MinecraftOAuthConfigurable implements Configurable {
             int selectedIndex = -1;
             for (int i = 0; i < state.accounts.size(); i++) {
                 MinecraftAccount acc = state.accounts.get(i);
-                String label = acc.username + " (" + acc.type + ")";
+                String label;
                 if (acc.isExpired()) {
-                    label = acc.username + " (EXPIRED - RE-LOGIN REQUIRED)";
+                    if (acc.canRefresh() && !refreshingIds.contains(acc.id)) {
+                        // Kick off a background silent refresh
+                        refreshingIds.add(acc.id);
+                        MinecraftAccount finalAcc = acc;
+                        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+                            manager.refreshAccount(finalAcc);
+                            refreshingIds.remove(finalAcc.id);
+                            SwingUtilities.invokeLater(this::refreshAccounts);
+                        });
+                        label = acc.username + " (Refreshing...)";
+                    } else if (refreshingIds.contains(acc.id)) {
+                        label = acc.username + " (Refreshing...)";
+                    } else {
+                        label = acc.username + " (EXPIRED - RE-LOGIN REQUIRED)";
+                    }
+                } else {
+                    label = acc.username + " (" + acc.type + ")";
                 }
                 accountBox.addItem(label);
                 if (acc.id.equals(selectedId)) selectedIndex = i;

@@ -34,6 +34,15 @@ public class MinecraftOAuthManager {
         public String accessToken;
     }
 
+    private static class MicrosoftTokenResult {
+        final String accessToken;
+        final String refreshToken;
+        MicrosoftTokenResult(String accessToken, String refreshToken) {
+            this.accessToken = accessToken;
+            this.refreshToken = refreshToken;
+        }
+    }
+
     public MinecraftSession session;
 
     // PKCE code verifier & challenge
@@ -87,13 +96,11 @@ public class MinecraftOAuthManager {
             System.out.println("Auth code received: " + code);
 
             // Exchange auth code → Microsoft token using PKCE
-            String msToken = getMicrosoftToken(code, codeVerifier);
-            System.out.println("Microsoft token: " + msToken);
+            MicrosoftTokenResult msResult = getMicrosoftToken(code, codeVerifier);
+            System.out.println("Microsoft token: " + msResult.accessToken);
 
-            // Microsoft token → Xbox Live token
-            // Microsoft token → Xbox Live token
             // Microsoft → Xbox Live
-            XboxAuthResult xboxAuth = getXboxToken(msToken);
+            XboxAuthResult xboxAuth = getXboxToken(msResult.accessToken);
             System.out.println("Xbox Live token: " + xboxAuth.token);
             System.out.println("Xbox UHS: " + xboxAuth.uhs);
 
@@ -122,6 +129,7 @@ public class MinecraftOAuthManager {
             account.username = mcSession.username;
             account.uuid = mcSession.uuid;
             account.accessToken = mcSession.accessToken;
+            account.msRefreshToken = msResult.refreshToken;
             account.expiresAt = System.currentTimeMillis() + (24L * 60 * 60 * 1000); // 24h
 
             MinecraftAccountsState state = MinecraftAccountsState.getInstance();
@@ -145,7 +153,7 @@ public class MinecraftOAuthManager {
         return map;
     }
 
-    private String getMicrosoftToken(String code, String codeVerifier) throws Exception {
+    private MicrosoftTokenResult getMicrosoftToken(String code, String codeVerifier) throws Exception {
         System.out.println("Exchanging code for Microsoft token...");
 
         RequestBody body = new FormBody.Builder()
@@ -168,7 +176,67 @@ public class MinecraftOAuthManager {
             if (!json.has("access_token")) {
                 throw new RuntimeException("Access token not found! Full response: " + respBody);
             }
-            return json.getString("access_token");
+            return new MicrosoftTokenResult(
+                    json.getString("access_token"),
+                    json.optString("refresh_token", null)
+            );
+        }
+    }
+
+    private MicrosoftTokenResult refreshMicrosoftToken(String refreshToken) throws Exception {
+        System.out.println("Refreshing Microsoft token using refresh_token...");
+
+        RequestBody body = new FormBody.Builder()
+                .add("client_id", getClientId())
+                .add("grant_type", "refresh_token")
+                .add("refresh_token", refreshToken)
+                .add("redirect_uri", REDIRECT_URI)
+                .build();
+
+        Request request = new Request.Builder()
+                .url("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+                .post(body)
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            String respBody = response.body().string();
+            System.out.println("MS token refresh response: " + respBody);
+            JSONObject json = new JSONObject(respBody);
+            if (!json.has("access_token")) {
+                throw new RuntimeException("Token refresh failed: " + respBody);
+            }
+            // Microsoft may rotate the refresh token; fall back to the old one if not returned
+            String newRefresh = json.optString("refresh_token", null);
+            return new MicrosoftTokenResult(
+                    json.getString("access_token"),
+                    newRefresh != null ? newRefresh : refreshToken
+            );
+        }
+    }
+
+    /**
+     * Silently re-authenticates an expired premium account using its stored Microsoft refresh token.
+     * Returns true on success, false if the refresh token is missing or invalid.
+     */
+    public boolean refreshAccount(MinecraftAccount account) {
+        if (account.msRefreshToken == null) return false;
+        try {
+            MicrosoftTokenResult msResult = refreshMicrosoftToken(account.msRefreshToken);
+            XboxAuthResult xboxAuth = getXboxToken(msResult.accessToken);
+            XboxAuthResult xstsAuth = getXstsToken(xboxAuth);
+            MinecraftSession mcSession = getMinecraftToken(xstsAuth);
+            if (mcSession == null) return false;
+
+            account.accessToken = mcSession.accessToken;
+            account.username = mcSession.username;
+            account.uuid = mcSession.uuid;
+            account.msRefreshToken = msResult.refreshToken;
+            account.expiresAt = System.currentTimeMillis() + (24L * 60 * 60 * 1000);
+            System.out.println("Token refreshed silently for: " + account.username);
+            return true;
+        } catch (Exception e) {
+            System.err.println("Silent token refresh failed for " + account.username + ": " + e.getMessage());
+            return false;
         }
     }
 

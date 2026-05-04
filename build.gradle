@@ -54,8 +54,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        pluginDescription.set(file("src/main/resources/META-INF/plugin.xml").text)
-        changeNotes.set("Initial release")
+        changeNotes.set("1.3: Silent background token refresh; auto-wire run config on project open; plugin description added.")
     }
 
     buildPlugin {
