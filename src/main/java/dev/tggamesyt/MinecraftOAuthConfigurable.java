@@ -46,12 +46,8 @@ public class MinecraftOAuthConfigurable implements Configurable {
         // --- Single "Add account" button ---
         JButton addButton = new JButton("Add Account");
         addButton.addActionListener(e -> showAddAccountMenu());
-        JPanel addRow = new JPanel(new FlowLayout(FlowLayout.LEFT));
-        addRow.add(addButton);
-
-        JPanel south = new JPanel(new BorderLayout());
-        south.add(addRow, BorderLayout.NORTH);
-        south.add(buildClientIdPanel(), BorderLayout.SOUTH);
+        JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        south.add(addButton);
 
         panel.add(scroll, BorderLayout.CENTER);
         panel.add(south, BorderLayout.SOUTH);
@@ -62,46 +58,6 @@ public class MinecraftOAuthConfigurable implements Configurable {
         refreshTimer = new Timer(60_000, e -> rebuild());
         refreshTimer.setRepeats(true);
         refreshTimer.start();
-    }
-
-    /**
-     * Settings row for the Azure app (client) ID used by QR / device-code login.
-     *
-     * <p>The built-in default is Mojang's official launcher app, which Microsoft will NOT let users
-     * consent to via the QR/device-code flow ("first party application"). To make QR work, register
-     * your own Azure app (personal accounts + "Allow public client flows" = Yes) and paste its
-     * client ID here.</p>
-     */
-    private JComponent buildClientIdPanel() {
-        JPanel p = new JPanel(new BorderLayout(8, 2));
-        p.setBorder(BorderFactory.createEmptyBorder(8, 8, 4, 8));
-
-        JLabel label = new JLabel("QR login Azure client ID:");
-        JTextField field = new JTextField(state.azureClientId == null ? "" : state.azureClientId);
-        field.setToolTipText("Application (client) ID of YOUR own Azure app registration. "
-                + "Leave blank to use the built-in default (note: the default cannot do QR login).");
-
-        // Persist on every edit so it's available the next time QR login runs.
-        field.getDocument().addDocumentListener(new javax.swing.event.DocumentListener() {
-            private void save() {
-                String v = field.getText().trim();
-                state.azureClientId = v.isEmpty() ? null : v;
-            }
-            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { save(); }
-            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { save(); }
-            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { save(); }
-        });
-
-        JLabel hint = new JLabel("<html><span style='font-size:9px'>"
-                + "Required for QR login. Must be your own app (personal accounts + "
-                + "\"Allow public client flows\" = Yes). The default is Mojang's app and can't do QR."
-                + "</span></html>");
-        hint.setForeground(UIManager.getColor("Label.disabledForeground"));
-
-        p.add(label, BorderLayout.WEST);
-        p.add(field, BorderLayout.CENTER);
-        p.add(hint, BorderLayout.SOUTH);
-        return p;
     }
 
     // ===== Add account =====
