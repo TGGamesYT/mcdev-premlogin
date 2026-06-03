@@ -119,12 +119,22 @@ public class MinecraftOAuthManager {
         public String userCode;
         public String verificationUri;
         public String verificationUriComplete; // may be null for MSA consumers
+        public String clientId;                 // the client ID this code was issued under
         public int interval = 5;
         public int expiresIn = 900;
 
-        /** Best URL to encode in a QR code: the complete one if present, else the plain verification URL. */
+        /**
+         * URL to encode in the QR code. Prefers the complete URL Microsoft hands back (which has the
+         * code embedded); otherwise builds one with {@code ?otc=<userCode>} so scanning the QR
+         * pre-fills the code and the user only has to approve.
+         */
         public String qrTarget() {
-            return verificationUriComplete != null ? verificationUriComplete : verificationUri;
+            if (verificationUriComplete != null && !verificationUriComplete.isBlank()) {
+                return verificationUriComplete;
+            }
+            if (verificationUri == null) return null;
+            String sep = verificationUri.contains("?") ? "&" : "?";
+            return verificationUri + sep + "otc=" + userCode;
         }
     }
 
@@ -167,6 +177,7 @@ public class MinecraftOAuthManager {
                 info.userCode = json.getString("user_code");
                 info.verificationUri = json.getString("verification_uri");
                 info.verificationUriComplete = json.optString("verification_uri_complete", null);
+                info.clientId = clientId; // remember which client issued this code, so polling matches
                 info.interval = json.optInt("interval", 5);
                 info.expiresIn = json.optInt("expires_in", 900);
                 return info;
@@ -199,9 +210,12 @@ public class MinecraftOAuthManager {
             Thread.sleep(interval * 1000L);
             if (cancelled.getAsBoolean()) return false;
 
+            // IMPORTANT: poll with the SAME client ID the code was issued under, otherwise Microsoft
+            // never reports the authorization as complete (the user's phone succeeds, but we time out).
+            String pollClientId = info.clientId != null ? info.clientId : getClientId();
             RequestBody body = new FormBody.Builder()
                     .add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
-                    .add("client_id", getClientId())
+                    .add("client_id", pollClientId)
                     .add("device_code", info.deviceCode)
                     .build();
 
