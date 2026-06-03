@@ -91,6 +91,127 @@ public class MinecraftOAuthManager {
         Desktop.getDesktop().browse(new URI(url));
     }
 
+    /** Persists a completed Minecraft session as the selected premium account. */
+    private void saveSession(MinecraftSession mcSession, String refreshToken) {
+        MinecraftAccount account = new MinecraftAccount();
+        account.type = MinecraftAccount.Type.PREMIUM;
+        account.username = mcSession.username;
+        account.uuid = mcSession.uuid;
+        account.accessToken = mcSession.accessToken;
+        account.msRefreshToken = refreshToken;
+        account.expiresAt = System.currentTimeMillis() + (24L * 60 * 60 * 1000); // 24h
+
+        MinecraftAccountsState state = MinecraftAccountsState.getInstance();
+        state.accounts.removeIf(a -> a.username.equals(account.username));
+        state.accounts.add(account);
+        state.selectedAccountId = account.id;
+    }
+
+    // ===== Device code flow (QR / "log in on another device") =====
+
+    public static class DeviceCodeInfo {
+        public String deviceCode;
+        public String userCode;
+        public String verificationUri;
+        public String verificationUriComplete; // may be null for MSA consumers
+        public int interval = 5;
+        public int expiresIn = 900;
+
+        /** Best URL to encode in a QR code: the complete one if present, else the plain verification URL. */
+        public String qrTarget() {
+            return verificationUriComplete != null ? verificationUriComplete : verificationUri;
+        }
+    }
+
+    /** Requests a device code from Microsoft. The caller shows the user code / QR and then polls. */
+    public DeviceCodeInfo startDeviceCode() throws Exception {
+        RequestBody body = new FormBody.Builder()
+                .add("client_id", getClientId())
+                .add("scope", "XboxLive.signin offline_access")
+                .build();
+
+        Request request = new Request.Builder()
+                .url("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
+                .post(body)
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (response.code() >= 500) {
+                throw new AuthServersDownException("Device code endpoint returned HTTP " + response.code());
+            }
+            JSONObject json = new JSONObject(response.body().string());
+            if (!json.has("device_code")) {
+                throw new RuntimeException("Device code request failed: " + json);
+            }
+            DeviceCodeInfo info = new DeviceCodeInfo();
+            info.deviceCode = json.getString("device_code");
+            info.userCode = json.getString("user_code");
+            info.verificationUri = json.getString("verification_uri");
+            info.verificationUriComplete = json.optString("verification_uri_complete", null);
+            info.interval = json.optInt("interval", 5);
+            info.expiresIn = json.optInt("expires_in", 900);
+            return info;
+        }
+    }
+
+    /**
+     * Polls the token endpoint until the user authorizes the device code, then completes the Xbox/
+     * XSTS/Minecraft chain and saves the account. Returns true on success. Stops early if
+     * {@code cancelled} becomes true. Never opens a browser.
+     */
+    public boolean pollDeviceCodeAndSave(DeviceCodeInfo info, java.util.function.BooleanSupplier cancelled) throws Exception {
+        long deadline = System.currentTimeMillis() + info.expiresIn * 1000L;
+        int interval = Math.max(info.interval, 1);
+
+        while (System.currentTimeMillis() < deadline) {
+            if (cancelled.getAsBoolean()) return false;
+            Thread.sleep(interval * 1000L);
+            if (cancelled.getAsBoolean()) return false;
+
+            RequestBody body = new FormBody.Builder()
+                    .add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
+                    .add("client_id", getClientId())
+                    .add("device_code", info.deviceCode)
+                    .build();
+
+            Request request = new Request.Builder()
+                    .url("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+                    .post(body)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                if (response.code() >= 500) {
+                    throw new AuthServersDownException("Token endpoint returned HTTP " + response.code());
+                }
+                JSONObject json = new JSONObject(response.body().string());
+
+                if (json.has("access_token")) {
+                    String accessToken = json.getString("access_token");
+                    String refreshToken = json.optString("refresh_token", null);
+
+                    XboxAuthResult xboxAuth = getXboxToken(accessToken);
+                    XboxAuthResult xstsAuth = getXstsToken(xboxAuth);
+                    MinecraftSession mcSession = getMinecraftToken(xstsAuth);
+                    if (mcSession == null) return false;
+
+                    saveSession(mcSession, refreshToken);
+                    return true;
+                }
+
+                switch (json.optString("error", "")) {
+                    case "authorization_pending":
+                        break;             // keep waiting
+                    case "slow_down":
+                        interval += 5;     // back off
+                        break;
+                    default:               // expired_token, authorization_declined, bad_verification_code, ...
+                        return false;
+                }
+            }
+        }
+        return false;
+    }
+
 
     private void handleCallback(HttpExchange exchange) {
         try {
@@ -135,18 +256,7 @@ public class MinecraftOAuthManager {
             try (OutputStream os = exchange.getResponseBody()) {
                 os.write(response.getBytes());
             }
-            MinecraftAccount account = new MinecraftAccount();
-            account.type = MinecraftAccount.Type.PREMIUM;
-            account.username = mcSession.username;
-            account.uuid = mcSession.uuid;
-            account.accessToken = mcSession.accessToken;
-            account.msRefreshToken = msResult.refreshToken;
-            account.expiresAt = System.currentTimeMillis() + (24L * 60 * 60 * 1000); // 24h
-
-            MinecraftAccountsState state = MinecraftAccountsState.getInstance();
-            state.accounts.removeIf(a -> a.username.equals(account.username));
-            state.accounts.add(account);
-            state.selectedAccountId = account.id;
+            saveSession(mcSession, msResult.refreshToken);
 
         } catch (ClientIdInvalidException e) {
             // Interactive login only: retry once with the fallback client ID.

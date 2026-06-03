@@ -39,6 +39,7 @@ dependencies {
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.16.2'
     implementation 'com.squareup.okhttp3:okhttp:5.0.0-alpha.11'
     implementation 'org.json:json:20230618'
+    implementation 'com.google.zxing:core:3.5.3' // QR code generation for device-code login
     // Testing
     testImplementation platform('org.junit:junit-bom:5.10.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
