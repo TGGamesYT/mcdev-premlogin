@@ -16,9 +16,14 @@ public class MinecraftProjectStartupActivity implements StartupActivity.DumbAwar
             MinecraftAccountsState state = MinecraftAccountsState.getInstance();
             MinecraftOAuthManager manager = new MinecraftOAuthManager();
 
-            state.accounts.stream()
-                    .filter(a -> a.isExpired() && a.canRefresh())
-                    .forEach(manager::refreshAccount);
+            // Only attempt silent refreshes if the auth servers are actually reachable.
+            // This avoids hammering offline endpoints (and, historically, spawning a browser
+            // login tab per account when refresh failed). refreshAccount() never opens a browser.
+            if (MinecraftOAuthManager.areAuthServersUp()) {
+                state.accounts.stream()
+                        .filter(a -> a.isExpired() && a.canRefresh())
+                        .forEach(manager::refreshAccount);
+            }
 
             MinecraftRunConfigUpdater.updateArgs();
         });

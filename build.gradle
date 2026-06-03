@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'dev.tggamesyt'
-version '1.4'
+version '1.5'
 
 repositories {
     mavenCentral()
@@ -54,7 +54,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.4: Silent background token refresh; auto-wire run config on project open; plugin description added.")
+        changeNotes.set("1.5: Detect when Minecraft/Microsoft auth servers are down and skip silent refresh instead of opening a browser login tab for every account on project open.")
     }
 
     buildPlugin {

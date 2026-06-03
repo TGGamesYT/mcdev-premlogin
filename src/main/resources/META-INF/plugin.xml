@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>dev.tggamesyt.mcdev-premlogin</id>
     <name>Minecraft OAuth</name>
-    <version>1.4</version>
+    <version>1.5</version>
     <vendor email="tgtggamesyt.dev" url="https://tggamesyt.dev">TGdoesCode</vendor>
 
     <description><![CDATA[

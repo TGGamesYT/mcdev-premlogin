@@ -6,6 +6,7 @@ import okhttp3.*;
 import org.json.JSONObject;
 
 import java.awt.*;
+import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.URI;
@@ -41,6 +42,16 @@ public class MinecraftOAuthManager {
             this.accessToken = accessToken;
             this.refreshToken = refreshToken;
         }
+    }
+
+    /** Thrown when the Azure client ID is not registered, so the interactive flow can retry with the fallback ID. */
+    private static class ClientIdInvalidException extends Exception {
+        ClientIdInvalidException(String message) { super(message); }
+    }
+
+    /** Thrown when an auth server is unreachable or returns a server-side error. Never triggers a browser login. */
+    public static class AuthServersDownException extends Exception {
+        AuthServersDownException(String message) { super(message); }
     }
 
     public MinecraftSession session;
@@ -137,6 +148,19 @@ public class MinecraftOAuthManager {
             state.accounts.add(account);
             state.selectedAccountId = account.id;
 
+        } catch (ClientIdInvalidException e) {
+            // Interactive login only: retry once with the fallback client ID.
+            if (isClientIdGood) {
+                System.out.println("Primary client ID rejected, retrying with fallback...");
+                isClientIdGood = false;
+                try {
+                    login();
+                } catch (Exception retry) {
+                    retry.printStackTrace();
+                }
+            } else {
+                System.err.println("Fallback client ID also rejected: " + e.getMessage());
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -170,6 +194,9 @@ public class MinecraftOAuthManager {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
+            if (response.code() >= 500) {
+                throw new AuthServersDownException("Microsoft token endpoint returned HTTP " + response.code());
+            }
             String respBody = response.body().string();
             System.out.println("Microsoft token response: " + respBody);
             JSONObject json = new JSONObject(respBody);
@@ -199,6 +226,9 @@ public class MinecraftOAuthManager {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
+            if (response.code() >= 500) {
+                throw new AuthServersDownException("Microsoft token endpoint returned HTTP " + response.code());
+            }
             String respBody = response.body().string();
             System.out.println("MS token refresh response: " + respBody);
             JSONObject json = new JSONObject(respBody);
@@ -215,11 +245,38 @@ public class MinecraftOAuthManager {
     }
 
     /**
+     * Lightweight reachability probe for the auth endpoints. Any HTTP response (even an error
+     * status) means the server is up; only a connection-level failure counts as "down".
+     */
+    public static boolean areAuthServersUp() {
+        String[] hosts = {
+                "https://login.microsoftonline.com/",
+                "https://api.minecraftservices.com/"
+        };
+        for (String host : hosts) {
+            Request req = new Request.Builder().url(host).head().build();
+            try (Response ignored = client.newCall(req).execute()) {
+                // reachable
+            } catch (IOException e) {
+                System.err.println("Auth server unreachable: " + host + " (" + e.getMessage() + ")");
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Silently re-authenticates an expired premium account using its stored Microsoft refresh token.
-     * Returns true on success, false if the refresh token is missing or invalid.
+     * Returns true on success, false otherwise. Never opens a browser: any failure (servers down,
+     * network error, invalid/expired refresh token) is handled gracefully so the user is not spammed
+     * with login tabs.
      */
     public boolean refreshAccount(MinecraftAccount account) {
-        if (account.msRefreshToken == null) return false;
+        if (account == null || account.msRefreshToken == null) return false;
+        if (!areAuthServersUp()) {
+            System.err.println("Auth servers are down; skipping silent refresh for " + account.username);
+            return false;
+        }
         try {
             MicrosoftTokenResult msResult = refreshMicrosoftToken(account.msRefreshToken);
             XboxAuthResult xboxAuth = getXboxToken(msResult.accessToken);
@@ -261,6 +318,9 @@ public class MinecraftOAuthManager {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
+            if (response.code() >= 500) {
+                throw new AuthServersDownException("Xbox Live endpoint returned HTTP " + response.code());
+            }
             String body = response.body().string();
             System.out.println("Xbox Live response: " + body);
 
@@ -299,6 +359,11 @@ public class MinecraftOAuthManager {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
+            // A 5xx response means Minecraft's auth service itself is having problems.
+            if (response.code() >= 500) {
+                throw new AuthServersDownException("Minecraft auth returned HTTP " + response.code());
+            }
+
             String body = response.body().string();
             System.out.println("Minecraft auth response: " + body);
 
@@ -307,13 +372,18 @@ public class MinecraftOAuthManager {
             String accessToken = json.optString("access_token"); // returns "" if not present
             String errorMessage = json.optString("errorMessage", ""); // returns "" if not present
 
-            if (accessToken.isEmpty() || errorMessage.contains("https://aka.ms/AppRegInfo")) {
-                System.out.println("The current CLIENT ID from Azure is not registered. More info: https://aka.ms/AppRegInfo");
-                isClientIdGood = false;
-                login();
-            } else {
+            // Bad Azure client ID — signal so the *interactive* flow can retry with the fallback ID.
+            // We never trigger a browser login here, so silent refresh stays silent.
+            if (errorMessage.contains("https://aka.ms/AppRegInfo")) {
+                throw new ClientIdInvalidException("Azure client ID not registered. More info: https://aka.ms/AppRegInfo");
+            }
+
+            if (accessToken.isEmpty()) {
+                throw new RuntimeException("Minecraft auth failed (no access token): " + body);
+            }
+
             MinecraftSession session = new MinecraftSession();
-            session.accessToken = json.getString("access_token");
+            session.accessToken = accessToken;
 
             // Fetch profile
             Request profileReq = new Request.Builder()
@@ -322,6 +392,9 @@ public class MinecraftOAuthManager {
                     .build();
 
             try (Response profileResp = client.newCall(profileReq).execute()) {
+                if (profileResp.code() >= 500) {
+                    throw new AuthServersDownException("Minecraft profile returned HTTP " + profileResp.code());
+                }
                 String profileBody = profileResp.body().string();
                 System.out.println("Profile response: " + profileBody);
 
@@ -331,9 +404,7 @@ public class MinecraftOAuthManager {
             }
 
             return session;
-            }
         }
-        return null;
     }
 
     private XboxAuthResult getXstsToken(XboxAuthResult xboxAuth) throws Exception {
@@ -358,6 +429,9 @@ public class MinecraftOAuthManager {
                 .build();
 
         try (Response response = client.newCall(request).execute()) {
+            if (response.code() >= 500) {
+                throw new AuthServersDownException("XSTS endpoint returned HTTP " + response.code());
+            }
             String body = response.body().string();
             System.out.println("XSTS response: " + body);
 
