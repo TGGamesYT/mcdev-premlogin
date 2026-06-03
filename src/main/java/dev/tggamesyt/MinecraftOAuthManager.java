@@ -151,7 +151,19 @@ public class MinecraftOAuthManager {
      * device code (AADSTS70002), and {@link AuthServersDownException} on connectivity failures.</p>
      */
     public DeviceCodeInfo startDeviceCode() throws Exception {
-        return requestDeviceCode(CLIENT_ID);
+        return requestDeviceCode(deviceCodeClientId());
+    }
+
+    /**
+     * Client ID to use for the device-code (QR) flow. The built-in {@link #CLIENT_ID} is Mojang's
+     * official first-party launcher app, which Microsoft forbids users from consenting to through the
+     * device-code flow. To make QR login work, the user must register their OWN Azure app (personal
+     * accounts, "Allow public client flows" = Yes) and put its client ID in the settings; we use that
+     * here when present.
+     */
+    public String deviceCodeClientId() {
+        String custom = MinecraftAccountsState.getInstance().azureClientId;
+        return (custom != null && !custom.isBlank()) ? custom.trim() : CLIENT_ID;
     }
 
     private DeviceCodeInfo requestDeviceCode(String clientId) throws Exception {

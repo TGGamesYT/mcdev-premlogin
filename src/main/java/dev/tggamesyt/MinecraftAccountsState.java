@@ -18,6 +18,8 @@ public class MinecraftAccountsState implements PersistentStateComponent<Minecraf
 
     public List<MinecraftAccount> accounts = new ArrayList<>();
     public String selectedAccountId;
+    /** Optional custom Azure app (client) ID used for QR / device-code login. Blank = use the built-in default. */
+    public String azureClientId;
 
     public static MinecraftAccountsState getInstance() {
         return ApplicationManager.getApplication()
@@ -34,6 +36,7 @@ public class MinecraftAccountsState implements PersistentStateComponent<Minecraf
     public void loadState(@NotNull MinecraftAccountsState state) {
         this.accounts = state.accounts;
         this.selectedAccountId = state.selectedAccountId;
+        this.azureClientId = state.azureClientId;
     }
     public void removeAccount(String accountId) {
         accounts.removeIf(a -> a.id.equals(accountId));
