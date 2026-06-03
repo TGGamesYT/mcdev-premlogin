@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.5: Detect when Minecraft/Microsoft auth servers are down and skip silent refresh instead of opening a browser login tab for every account on project open.")
+        changeNotes.set("1.5: Redesigned the Minecraft Accounts panel into a clean list with player-head avatars and per-account menus, added QR-code (scan-with-phone) Microsoft login, and made expiring sessions refresh silently instead of forcing re-login or opening browser tabs when auth servers are down.")
     }
 
     buildPlugin {
