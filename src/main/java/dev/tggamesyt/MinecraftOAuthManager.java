@@ -19,6 +19,16 @@ public class MinecraftOAuthManager {
     private static final String FALLBACK_CLIENT_ID = "5e195e4a-43bc-4ae7-bc32-3e5c8ad97729";
     private static final String CLIENT_ID = "bde036fb-5483-42f3-9abf-27507bf3f510";
     private static final String REDIRECT_URI = "http://localhost:3008";
+
+    // Device-code / QR login uses the Microsoft Account (login.live.com) flow with the public Xbox
+    // client ID instead of the Azure AD flow. The Azure device-code flow can't grant the Xbox Live
+    // (XboxLive.signin) consent on a phone ("first party application ... users are not permitted to
+    // consent"), but this MSA flow is exactly what Xbox/Minecraft device login is designed for and
+    // has no such restriction. Tokens from here are RPS tickets, used with the "t=" prefix.
+    private static final String XBOX_CLIENT_ID = "00000000402b5328";
+    private static final String LIVE_DEVICECODE_URL = "https://login.live.com/oauth20_connect.srf";
+    private static final String LIVE_TOKEN_URL = "https://login.live.com/oauth20_token.srf";
+    private static final String LIVE_SCOPE = "service::user.auth.xboxlive.com::MBI_SSL";
     private static HttpServer callbackServer;
     private static boolean serverStarted = false;
     private static final OkHttpClient client = new OkHttpClient();
@@ -96,14 +106,20 @@ public class MinecraftOAuthManager {
         Desktop.getDesktop().browse(new URI(url));
     }
 
-    /** Persists a completed Minecraft session as the selected premium account. */
+    /** Persists a completed Minecraft session from the browser (Azure) flow. */
     private void saveSession(MinecraftSession mcSession, String refreshToken) {
+        saveSession(mcSession, refreshToken, "azure");
+    }
+
+    /** Persists a completed Minecraft session as the selected premium account. */
+    private void saveSession(MinecraftSession mcSession, String refreshToken, String authKind) {
         MinecraftAccount account = new MinecraftAccount();
         account.type = MinecraftAccount.Type.PREMIUM;
         account.username = mcSession.username;
         account.uuid = mcSession.uuid;
         account.accessToken = mcSession.accessToken;
         account.msRefreshToken = refreshToken;
+        account.authKind = authKind;
         account.expiresAt = System.currentTimeMillis() + (24L * 60 * 60 * 1000); // 24h
 
         MinecraftAccountsState state = MinecraftAccountsState.getInstance();
@@ -139,41 +155,31 @@ public class MinecraftOAuthManager {
     }
 
     /**
-     * Requests a device code from Microsoft using our own (primary) client ID.
+     * Requests a device code for QR login via the Microsoft Account (login.live.com) flow using the
+     * public Xbox client ID.
      *
-     * <p>We deliberately do NOT fall back to the secondary client ID here: that ID is a Microsoft
-     * first-party application, and users are not permitted to consent to first-party apps through
-     * the device code flow ("users are not permitted to consent to first party applications").
-     * Device code login therefore only works once the primary app registration has
-     * "Allow public client flows" enabled in Azure.</p>
+     * <p>We use this instead of the Azure AD device-code endpoint on purpose: the Azure flow cannot
+     * obtain the Xbox Live (XboxLive.signin) consent on a second device — the verification page
+     * rejects it with "the application is a first party application ... users are not permitted to
+     * consent to first party applications". The login.live.com flow with client ID
+     * {@value #XBOX_CLIENT_ID} is the native Xbox/Minecraft device-login path and has no such
+     * restriction, so QR login works without any Azure app configuration at all.</p>
      *
-     * <p>Throws {@link DeviceCodeUnsupportedException} if the primary app isn't configured for
-     * device code (AADSTS70002), and {@link AuthServersDownException} on connectivity failures.</p>
+     * <p>Throws {@link AuthServersDownException} on connectivity failures.</p>
      */
     public DeviceCodeInfo startDeviceCode() throws Exception {
-        return requestDeviceCode(deviceCodeClientId());
-    }
-
-    /**
-     * Client ID to use for the device-code (QR) flow. The built-in {@link #CLIENT_ID} is Mojang's
-     * official first-party launcher app, which Microsoft forbids users from consenting to through the
-     * device-code flow. To make QR login work, the user must register their OWN Azure app (personal
-     * accounts, "Allow public client flows" = Yes) and put its client ID in the settings; we use that
-     * here when present.
-     */
-    public String deviceCodeClientId() {
-        String custom = MinecraftAccountsState.getInstance().azureClientId;
-        return (custom != null && !custom.isBlank()) ? custom.trim() : CLIENT_ID;
+        return requestDeviceCode(XBOX_CLIENT_ID);
     }
 
     private DeviceCodeInfo requestDeviceCode(String clientId) throws Exception {
         RequestBody body = new FormBody.Builder()
                 .add("client_id", clientId)
-                .add("scope", "XboxLive.signin offline_access")
+                .add("scope", LIVE_SCOPE)
+                .add("response_type", "device_code")
                 .build();
 
         Request request = new Request.Builder()
-                .url("https://login.microsoftonline.com/consumers/oauth2/v2.0/devicecode")
+                .url(LIVE_DEVICECODE_URL)
                 .post(body)
                 .build();
 
@@ -192,14 +198,6 @@ public class MinecraftOAuthManager {
                 info.interval = json.optInt("interval", 5);
                 info.expiresIn = json.optInt("expires_in", 900);
                 return info;
-            }
-            // Check if the error is specifically "client not allowed for device code".
-            String error = json.optString("error", "");
-            String desc  = json.optString("error_description", "");
-            if (error.equals("unauthorized_client") || error.equals("unsupported_grant_type")
-                    || desc.contains("AADSTS70002") || desc.contains("AADSTS53003")
-                    || desc.contains("marked as") || desc.contains("mobile")) {
-                throw new DeviceCodeUnsupportedException();
             }
             throw new RuntimeException("Device code request failed: " + json);
         } catch (IOException e) {
@@ -221,9 +219,8 @@ public class MinecraftOAuthManager {
             Thread.sleep(interval * 1000L);
             if (cancelled.getAsBoolean()) return false;
 
-            // IMPORTANT: poll with the SAME client ID the code was issued under, otherwise Microsoft
-            // never reports the authorization as complete (the user's phone succeeds, but we time out).
-            String pollClientId = info.clientId != null ? info.clientId : getClientId();
+            // Poll the login.live.com token endpoint with the same client ID the code was issued under.
+            String pollClientId = info.clientId != null ? info.clientId : XBOX_CLIENT_ID;
             RequestBody body = new FormBody.Builder()
                     .add("grant_type", "urn:ietf:params:oauth:grant-type:device_code")
                     .add("client_id", pollClientId)
@@ -231,7 +228,7 @@ public class MinecraftOAuthManager {
                     .build();
 
             Request request = new Request.Builder()
-                    .url("https://login.microsoftonline.com/consumers/oauth2/v2.0/token")
+                    .url(LIVE_TOKEN_URL)
                     .post(body)
                     .build();
 
@@ -245,12 +242,13 @@ public class MinecraftOAuthManager {
                     String accessToken = json.getString("access_token");
                     String refreshToken = json.optString("refresh_token", null);
 
-                    XboxAuthResult xboxAuth = getXboxToken(accessToken);
+                    // login.live.com tokens are RPS tickets → "t=" prefix for the Xbox exchange.
+                    XboxAuthResult xboxAuth = getXboxToken(accessToken, false);
                     XboxAuthResult xstsAuth = getXstsToken(xboxAuth);
                     MinecraftSession mcSession = getMinecraftToken(xstsAuth);
                     if (mcSession == null) return false;
 
-                    saveSession(mcSession, refreshToken);
+                    saveSession(mcSession, refreshToken, "live");
                     return true;
                 }
 
@@ -410,6 +408,39 @@ public class MinecraftOAuthManager {
         }
     }
 
+    /** Silently refreshes a login.live.com (device-code/QR) account using its stored refresh token. */
+    private MicrosoftTokenResult refreshLiveToken(String refreshToken) throws Exception {
+        System.out.println("Refreshing login.live.com token using refresh_token...");
+
+        RequestBody body = new FormBody.Builder()
+                .add("client_id", XBOX_CLIENT_ID)
+                .add("grant_type", "refresh_token")
+                .add("scope", LIVE_SCOPE)
+                .add("refresh_token", refreshToken)
+                .build();
+
+        Request request = new Request.Builder()
+                .url(LIVE_TOKEN_URL)
+                .post(body)
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (response.code() >= 500) {
+                throw new AuthServersDownException("login.live.com token endpoint returned HTTP " + response.code());
+            }
+            String respBody = response.body().string();
+            JSONObject json = new JSONObject(respBody);
+            if (!json.has("access_token")) {
+                throw new RuntimeException("Live token refresh failed: " + respBody);
+            }
+            String newRefresh = json.optString("refresh_token", null);
+            return new MicrosoftTokenResult(
+                    json.getString("access_token"),
+                    newRefresh != null ? newRefresh : refreshToken
+            );
+        }
+    }
+
     /**
      * Lightweight reachability probe for the auth endpoints. Any HTTP response (even an error
      * status) means the server is up; only a connection-level failure counts as "down".
@@ -444,8 +475,11 @@ public class MinecraftOAuthManager {
             return false;
         }
         try {
-            MicrosoftTokenResult msResult = refreshMicrosoftToken(account.msRefreshToken);
-            XboxAuthResult xboxAuth = getXboxToken(msResult.accessToken);
+            boolean live = "live".equals(account.authKind);
+            MicrosoftTokenResult msResult = live
+                    ? refreshLiveToken(account.msRefreshToken)
+                    : refreshMicrosoftToken(account.msRefreshToken);
+            XboxAuthResult xboxAuth = getXboxToken(msResult.accessToken, !live);
             XboxAuthResult xstsAuth = getXstsToken(xboxAuth);
             MinecraftSession mcSession = getMinecraftToken(xstsAuth);
             if (mcSession == null) return false;
@@ -464,11 +498,19 @@ public class MinecraftOAuthManager {
     }
 
     private XboxAuthResult getXboxToken(String msToken) throws Exception {
+        return getXboxToken(msToken, true);
+    }
+
+    /**
+     * Exchanges a Microsoft token for an Xbox Live user token. Azure AD access tokens use the "d="
+     * RpsTicket prefix; login.live.com (device-code) tokens use "t=".
+     */
+    private XboxAuthResult getXboxToken(String msToken, boolean azure) throws Exception {
         JSONObject payload = new JSONObject();
         payload.put("Properties", new JSONObject()
                 .put("AuthMethod", "RPS")
                 .put("SiteName", "user.auth.xboxlive.com")
-                .put("RpsTicket", "d=" + msToken));
+                .put("RpsTicket", (azure ? "d=" : "t=") + msToken));
         payload.put("RelyingParty", "http://auth.xboxlive.com");
         payload.put("TokenType", "JWT");
 
