@@ -54,6 +54,11 @@ public class MinecraftOAuthManager {
         AuthServersDownException(String message) { super(message); }
     }
 
+    /** Thrown when neither client ID supports the device code grant (app not registered as mobile/public). */
+    public static class DeviceCodeUnsupportedException extends Exception {
+        DeviceCodeUnsupportedException() { super("Neither client ID supports device code flow."); }
+    }
+
     public MinecraftSession session;
 
     // PKCE code verifier & challenge
@@ -123,10 +128,26 @@ public class MinecraftOAuthManager {
         }
     }
 
-    /** Requests a device code from Microsoft. The caller shows the user code / QR and then polls. */
+    /**
+     * Requests a device code from Microsoft. Tries the primary client ID first; if Microsoft
+     * rejects it because the app isn't registered as a public/mobile client (AADSTS70002 /
+     * AADSTS53003 / unsupported_grant_type / unauthorized_client), automatically retries with the
+     * fallback ID. If both are rejected, throws {@link DeviceCodeUnsupportedException}. Connection
+     * errors throw {@link AuthServersDownException}.
+     */
     public DeviceCodeInfo startDeviceCode() throws Exception {
+        try {
+            return requestDeviceCode(CLIENT_ID);
+        } catch (DeviceCodeUnsupportedException e) {
+            // Primary client ID not registered for device code; try fallback.
+            System.out.println("Primary client ID rejected for device code, trying fallback...");
+            return requestDeviceCode(FALLBACK_CLIENT_ID);
+        }
+    }
+
+    private DeviceCodeInfo requestDeviceCode(String clientId) throws Exception {
         RequestBody body = new FormBody.Builder()
-                .add("client_id", getClientId())
+                .add("client_id", clientId)
                 .add("scope", "XboxLive.signin offline_access")
                 .build();
 
@@ -140,17 +161,27 @@ public class MinecraftOAuthManager {
                 throw new AuthServersDownException("Device code endpoint returned HTTP " + response.code());
             }
             JSONObject json = new JSONObject(response.body().string());
-            if (!json.has("device_code")) {
-                throw new RuntimeException("Device code request failed: " + json);
+            if (json.has("device_code")) {
+                DeviceCodeInfo info = new DeviceCodeInfo();
+                info.deviceCode = json.getString("device_code");
+                info.userCode = json.getString("user_code");
+                info.verificationUri = json.getString("verification_uri");
+                info.verificationUriComplete = json.optString("verification_uri_complete", null);
+                info.interval = json.optInt("interval", 5);
+                info.expiresIn = json.optInt("expires_in", 900);
+                return info;
             }
-            DeviceCodeInfo info = new DeviceCodeInfo();
-            info.deviceCode = json.getString("device_code");
-            info.userCode = json.getString("user_code");
-            info.verificationUri = json.getString("verification_uri");
-            info.verificationUriComplete = json.optString("verification_uri_complete", null);
-            info.interval = json.optInt("interval", 5);
-            info.expiresIn = json.optInt("expires_in", 900);
-            return info;
+            // Check if the error is specifically "client not allowed for device code".
+            String error = json.optString("error", "");
+            String desc  = json.optString("error_description", "");
+            if (error.equals("unauthorized_client") || error.equals("unsupported_grant_type")
+                    || desc.contains("AADSTS70002") || desc.contains("AADSTS53003")
+                    || desc.contains("marked as") || desc.contains("mobile")) {
+                throw new DeviceCodeUnsupportedException();
+            }
+            throw new RuntimeException("Device code request failed: " + json);
+        } catch (IOException e) {
+            throw new AuthServersDownException("Cannot reach Microsoft auth servers: " + e.getMessage());
         }
     }
 

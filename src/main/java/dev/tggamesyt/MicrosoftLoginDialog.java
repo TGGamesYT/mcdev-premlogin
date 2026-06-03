@@ -10,24 +10,37 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 
 /**
- * Dialog for adding a Microsoft account. Shows a QR code + device code (scan with a phone) and also
- * offers the classic in-browser login as a fallback. Closes itself once an account is added.
+ * Dialog for adding a Microsoft account.
+ *
+ * <p>Normal path: shows a QR code + device code so the user can scan with a phone.
+ * Closes itself once the account is saved.</p>
+ *
+ * <p>Degraded paths (shown as a clear message instead of raw errors):</p>
+ * <ul>
+ *   <li>Device code not supported by client ID → offer browser login or cracked account.</li>
+ *   <li>Auth servers unreachable → tell the user and suggest cracked account.</li>
+ * </ul>
  */
 public class MicrosoftLoginDialog extends DialogWrapper {
 
     private final MinecraftOAuthManager manager;
     private final Runnable onSuccess;
-
     private volatile boolean cancelled = false;
 
-    private final JLabel qrLabel = new JLabel();
+    // Center panel swapped out depending on state
+    private JPanel centerPanel;
+
+    // QR flow widgets
+    private final JLabel qrLabel   = new JLabel();
     private final JLabel codeLabel = new JLabel("Requesting login code…", SwingConstants.CENTER);
-    private final JLabel statusLabel = new JLabel(" ", SwingConstants.CENTER);
+    private final JLabel statusLabel;
 
     public MicrosoftLoginDialog(@Nullable Project project, MinecraftOAuthManager manager, Runnable onSuccess) {
         super(project);
         this.manager = manager;
         this.onSuccess = onSuccess;
+        statusLabel = new JLabel(" ", SwingConstants.CENTER);
+        statusLabel.setForeground(UIManager.getColor("Label.disabledForeground"));
         setTitle("Add Microsoft Account");
         setOKButtonText("Login in browser instead");
         init();
@@ -36,17 +49,26 @@ public class MicrosoftLoginDialog extends DialogWrapper {
 
     @Override
     protected JComponent createCenterPanel() {
+        centerPanel = buildQrPanel();
+        return centerPanel;
+    }
+
+    // ===== Panel builders =====
+
+    private JPanel buildQrPanel() {
         JPanel panel = new JPanel(new BorderLayout(0, 10));
         panel.setBorder(BorderFactory.createEmptyBorder(12, 16, 12, 16));
+        panel.setPreferredSize(new Dimension(320, 340));
 
-        JLabel title = new JLabel("Scan the QR code with your phone, or open the link and enter the code:",
+        JLabel title = new JLabel(
+                "<html><div style='text-align:center'>Scan the QR code with your phone,<br>"
+                        + "or open the link and enter the code:</div></html>",
                 SwingConstants.CENTER);
 
         qrLabel.setHorizontalAlignment(SwingConstants.CENTER);
         qrLabel.setPreferredSize(new Dimension(240, 240));
 
-        codeLabel.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
-        statusLabel.setForeground(UIManager.getColor("Label.disabledForeground"));
+        codeLabel.setBorder(BorderFactory.createEmptyBorder(6, 0, 0, 0));
 
         JPanel bottom = new JPanel(new BorderLayout());
         bottom.add(codeLabel, BorderLayout.NORTH);
@@ -58,6 +80,64 @@ public class MicrosoftLoginDialog extends DialogWrapper {
         return panel;
     }
 
+    /** Shown when QR / device code is unavailable but browser login might still work. */
+    private JPanel buildQrUnavailablePanel() {
+        return buildMessagePanel(
+                "QR / device code login is not available",
+                "<html><div style='text-align:center;padding:0 12px'>"
+                        + "The Microsoft app registration for this plugin doesn't support device code login.<br><br>"
+                        + "Click <b>Login in browser instead</b> below to log in the normal way,<br>"
+                        + "or close this dialog and add a <b>cracked account</b> instead."
+                        + "</div></html>",
+                new Color(0xFF, 0xA5, 0x00) // orange icon-ish
+        );
+    }
+
+    /** Shown when auth servers are unreachable. */
+    private JPanel buildServersDownPanel() {
+        return buildMessagePanel(
+                "Microsoft / Minecraft auth servers are unreachable",
+                "<html><div style='text-align:center;padding:0 12px'>"
+                        + "Could not connect to Microsoft's login servers.<br>"
+                        + "This usually means they are temporarily down or your internet is offline.<br><br>"
+                        + "Close this dialog and add a <b>cracked account</b> instead, or try again later."
+                        + "</div></html>",
+                new Color(0xE5, 0x39, 0x35) // red
+        );
+    }
+
+    private static JPanel buildMessagePanel(String heading, String body, Color iconColor) {
+        JPanel panel = new JPanel(new BorderLayout(0, 12));
+        panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        panel.setPreferredSize(new Dimension(380, 200));
+
+        JLabel icon = new JLabel("⚠", SwingConstants.CENTER);
+        icon.setForeground(iconColor);
+        icon.setFont(icon.getFont().deriveFont(36f));
+
+        JLabel title = new JLabel("<html><b>" + heading + "</b></html>", SwingConstants.CENTER);
+        JLabel msg   = new JLabel(body, SwingConstants.CENTER);
+
+        JPanel text = new JPanel(new BorderLayout(0, 8));
+        text.add(title, BorderLayout.NORTH);
+        text.add(msg,   BorderLayout.CENTER);
+
+        panel.add(icon, BorderLayout.NORTH);
+        panel.add(text, BorderLayout.CENTER);
+        return panel;
+    }
+
+    private void swapPanel(JPanel next) {
+        centerPanel.removeAll();
+        centerPanel.setLayout(new BorderLayout());
+        centerPanel.add(next, BorderLayout.CENTER);
+        centerPanel.revalidate();
+        centerPanel.repaint();
+        pack();
+    }
+
+    // ===== Device flow =====
+
     private void startDeviceFlow() {
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
             try {
@@ -66,8 +146,9 @@ public class MicrosoftLoginDialog extends DialogWrapper {
 
                 SwingUtilities.invokeLater(() -> {
                     if (qr != null) qrLabel.setIcon(new ImageIcon(qr));
-                    codeLabel.setText("<html><div style='text-align:center'>Go to <b>" + info.verificationUri
-                            + "</b><br>and enter code <font size='+1'><b>" + info.userCode + "</b></font></div></html>");
+                    codeLabel.setText("<html><div style='text-align:center'>Go to <b>"
+                            + info.verificationUri + "</b><br>"
+                            + "and enter code <font size='+1'><b>" + info.userCode + "</b></font></div></html>");
                     statusLabel.setText("Waiting for you to sign in…");
                 });
 
@@ -81,16 +162,38 @@ public class MicrosoftLoginDialog extends DialogWrapper {
                         statusLabel.setText("Login failed or timed out — close and try again.");
                     }
                 });
+
+            } catch (MinecraftOAuthManager.DeviceCodeUnsupportedException e) {
+                SwingUtilities.invokeLater(() -> {
+                    swapPanel(buildQrUnavailablePanel());
+                    // Keep the "Login in browser instead" button — it still works.
+                });
+            } catch (MinecraftOAuthManager.AuthServersDownException e) {
+                SwingUtilities.invokeLater(() -> {
+                    swapPanel(buildServersDownPanel());
+                    setOKButtonText("Close");
+                    getOKAction().putValue("serversDown", true);
+                });
             } catch (Exception ex) {
-                SwingUtilities.invokeLater(() -> statusLabel.setText("Error: " + ex.getMessage()));
+                SwingUtilities.invokeLater(() ->
+                        statusLabel.setText("Error: " + ex.getMessage()));
             }
         });
     }
 
-    /** OK button = classic in-browser login. Watches for the new account, then closes. */
+    // ===== Button actions =====
+
     @Override
     protected void doOKAction() {
+        // If we showed the servers-down panel, OK just closes.
+        if (getOKAction().getValue("serversDown") != null) {
+            doCancelAction();
+            return;
+        }
+
+        cancelled = true; // stop device-code polling if still running
         statusLabel.setText("Opening browser…");
+
         MinecraftAccountsState state = MinecraftAccountsState.getInstance();
         final int before = state.accounts.size();
         final String beforeSelected = state.selectedAccountId;
@@ -104,7 +207,7 @@ public class MicrosoftLoginDialog extends DialogWrapper {
             }
             // Wait for handleCallback() to store the account (up to ~3 minutes).
             long deadline = System.currentTimeMillis() + 180_000L;
-            while (System.currentTimeMillis() < deadline && !cancelled) {
+            while (System.currentTimeMillis() < deadline) {
                 boolean changed = state.accounts.size() != before
                         || (state.selectedAccountId != null && !state.selectedAccountId.equals(beforeSelected));
                 if (changed) {
