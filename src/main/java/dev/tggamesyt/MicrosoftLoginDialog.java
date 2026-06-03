@@ -85,9 +85,12 @@ public class MicrosoftLoginDialog extends DialogWrapper {
         return buildMessagePanel(
                 "QR / device code login is not available",
                 "<html><div style='text-align:center;padding:0 12px'>"
-                        + "The Microsoft app registration for this plugin doesn't support device code login.<br><br>"
-                        + "Click <b>Login in browser instead</b> below to log in the normal way,<br>"
-                        + "or close this dialog and add a <b>cracked account</b> instead."
+                        + "This plugin's Microsoft app registration doesn't have device code login enabled.<br><br>"
+                        + "To enable it: Azure Portal &rarr; App registrations &rarr; your app &rarr;<br>"
+                        + "<b>Authentication</b> &rarr; Advanced settings &rarr;<br>"
+                        + "set <b>\"Allow public client flows\"</b> to <b>Yes</b>.<br><br>"
+                        + "For now, click <b>Login in browser instead</b> below,<br>"
+                        + "or close this dialog and add a <b>cracked account</b>."
                         + "</div></html>",
                 new Color(0xFF, 0xA5, 0x00) // orange icon-ish
         );

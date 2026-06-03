@@ -139,20 +139,19 @@ public class MinecraftOAuthManager {
     }
 
     /**
-     * Requests a device code from Microsoft. Tries the primary client ID first; if Microsoft
-     * rejects it because the app isn't registered as a public/mobile client (AADSTS70002 /
-     * AADSTS53003 / unsupported_grant_type / unauthorized_client), automatically retries with the
-     * fallback ID. If both are rejected, throws {@link DeviceCodeUnsupportedException}. Connection
-     * errors throw {@link AuthServersDownException}.
+     * Requests a device code from Microsoft using our own (primary) client ID.
+     *
+     * <p>We deliberately do NOT fall back to the secondary client ID here: that ID is a Microsoft
+     * first-party application, and users are not permitted to consent to first-party apps through
+     * the device code flow ("users are not permitted to consent to first party applications").
+     * Device code login therefore only works once the primary app registration has
+     * "Allow public client flows" enabled in Azure.</p>
+     *
+     * <p>Throws {@link DeviceCodeUnsupportedException} if the primary app isn't configured for
+     * device code (AADSTS70002), and {@link AuthServersDownException} on connectivity failures.</p>
      */
     public DeviceCodeInfo startDeviceCode() throws Exception {
-        try {
-            return requestDeviceCode(CLIENT_ID);
-        } catch (DeviceCodeUnsupportedException e) {
-            // Primary client ID not registered for device code; try fallback.
-            System.out.println("Primary client ID rejected for device code, trying fallback...");
-            return requestDeviceCode(FALLBACK_CLIENT_ID);
-        }
+        return requestDeviceCode(CLIENT_ID);
     }
 
     private DeviceCodeInfo requestDeviceCode(String clientId) throws Exception {
