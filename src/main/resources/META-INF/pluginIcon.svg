@@ -1,0 +1,46 @@
+<svg viewBox="0 0 124.94948 124.94948" xmlns="http://www.w3.org/2000/svg">
+
+  <defs>
+    <clipPath id="diamondClip">
+      <rect x="48.644566" y="92.144753" width="112.71147" height="112.71147" transform="rotate(45)"/>
+    </clipPath>
+  </defs>
+
+  <!-- Corners -->
+  <path
+    fill="#3c4d5c"
+    transform="translate(-42.525053,-86.02524) scale(0.26458333)"
+    d="m160.72461,325.13477v117.18359l23.125,-23.125v-70.93359h70.93359l23.125,-23.125zm355.06641,0l23.125,23.125h70.93359v70.93359l23.125,23.125V325.13477zm-355.06641,355.0664v117.1836H277.9082l-23.125,-23.125h-70.93359v-70.9336zm472.25,0l-23.125,23.125v70.9336h-70.93359l-23.125,23.125h117.18359z" />
+
+  <!-- Background Diamond -->
+  <path
+    fill="#234460"
+    clip-path="url(#diamondClip)"
+    transform="translate(-42.525053,-86.02524) rotate(-45)"
+    d="m-97.188177,165.98053 53.158029,-53.15802h26.541741l53.158031,53.15803v26.54174l-53.158029,53.15803h-26.541743l-53.158031,-53.15803z" />
+
+  <!-- Outer Frame -->
+  <rect
+    x="25.81"
+    y="21.29"
+    width="73.33"
+    height="73.33"
+    fill="none"
+    stroke="#d9e3ec"
+    stroke-width="4.7" />
+
+  <!-- Center Text -->
+  <text
+    x="62.47474"
+    y="57"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    fill="#ffd400"
+    font-family="monospace"
+    font-size="14"
+    font-weight="900"
+    letter-spacing="2">
+    OAuth
+  </text>
+
+</svg>
