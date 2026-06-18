@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'dev.tggamesyt'
-version '1.6'
+version '1.7'
 
 repositories {
     mavenCentral()
@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.6: Updated description, icon and images")
+        changeNotes.set("1.7: Updated icon")
     }
 
     buildPlugin {
