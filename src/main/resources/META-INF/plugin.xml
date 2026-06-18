@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>dev.tggamesyt.mcdev-premlogin</id>
     <name>Minecraft OAuth</name>
-    <version>1.6</version>
+    <version>1.7</version>
     <vendor email="tg@tggamesyt.dev" url="https://tggamesyt.dev">TGdoesCode</vendor>
 
     <description><![CDATA[
@@ -33,7 +33,6 @@
         <action id="MinecraftOAuthLoginAction"
                 class="dev.tggamesyt.MinecraftOAuthLoginAction"
                 text="Login to Minecraft"
-                description="Login with Microsoft for premium Minecraft"
-                icon="/icons/icon.png"/>
+                description="Login with Microsoft for premium Minecraft"/>
     </actions>
 </idea-plugin>
