@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'dev.tggamesyt'
-version '1.5'
+version '1.6'
 
 repositories {
     mavenCentral()
@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.5: Redesigned the Minecraft Accounts panel into a clean list with player-head avatars and per-account menus, added QR-code (scan-with-phone) Microsoft login, and made expiring sessions refresh silently instead of forcing re-login or opening browser tabs when auth servers are down.")
+        changeNotes.set("1.6: Updated description, icon and images")
     }
 
     buildPlugin {

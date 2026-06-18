@@ -1,20 +1,20 @@
 <idea-plugin>
     <id>dev.tggamesyt.mcdev-premlogin</id>
     <name>Minecraft OAuth</name>
-    <version>1.5</version>
-    <vendor email="tgtggamesyt.dev" url="https://tggamesyt.dev">TGdoesCode</vendor>
+    <version>1.6</version>
+    <vendor email="tg@tggamesyt.dev" url="https://tggamesyt.dev">TGdoesCode</vendor>
 
     <description><![CDATA[
         Companion plugin for the Minecraft Dev plugin that lets you authenticate with a
         Microsoft (premium) account or set a cracked username before launching the Minecraft
         client from an IntelliJ run configuration.<br><br>
-        Features:<br>
-        <ul>
-          <li>Microsoft OAuth 2.0 login with PKCE (premium accounts)</li>
-          <li>Cracked / offline username support</li>
-          <li>Silent background token refresh — no re-login needed after everyday inactivity</li>
-          <li>Automatically wires up the Minecraft Client run configuration in new projects</li>
-          <li>Multiple account support with per-project run configuration name override</li>
+        Usage:<br>
+        <url>
+          <li>Download and install the latest version of <a href="https://plugins.jetbrains.com/plugin/8327-minecraft-development">Minecraft Development</a></li>
+          <li>Download and install the lastest version of this plugin</li>
+          <li>Open a Minecraft Development project, go to <b>Settings</b>, than <b>Minecraft Accounts</b></li>
+          <li>Add your desired <b>Microsoft account</b> with the given <b>QR code or link</b>, or specify an <b>offline username</b></li>
+          <li>And finally start the <b>Minecraft Client configuration</b></li>
         </ul>
     ]]></description>
 
@@ -33,6 +33,7 @@
         <action id="MinecraftOAuthLoginAction"
                 class="dev.tggamesyt.MinecraftOAuthLoginAction"
                 text="Login to Minecraft"
-                description="Login with Microsoft for premium Minecraft"/>
+                description="Login with Microsoft for premium Minecraft"
+                icon="/icons/icon.png"/>
     </actions>
 </idea-plugin>
