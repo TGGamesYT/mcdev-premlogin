@@ -23,6 +23,24 @@ public class MinecraftRunConfigUpdater {
         configName = name;
     }
 
+    public static String getConfigName() {
+        return configName;
+    }
+
+    /** The currently selected account, defaulting to the first one if nothing is selected yet. */
+    public static MinecraftAccount selectedAccount() {
+        MinecraftAccountsState state = MinecraftAccountsState.getInstance();
+        if (state.accounts.isEmpty()) return null;
+        if (state.selectedAccountId == null
+                || state.accounts.stream().noneMatch(a -> a.id.equals(state.selectedAccountId))) {
+            state.selectedAccountId = state.accounts.get(0).id;
+        }
+        return state.accounts.stream()
+                .filter(a -> a.id.equals(state.selectedAccountId))
+                .findFirst()
+                .orElse(null);
+    }
+
     /**
      * Updates the Minecraft Client run configuration with the currently selected account
      * using IntelliJ's RunManager API for reliable persistence.
@@ -32,12 +50,7 @@ public class MinecraftRunConfigUpdater {
         if (project == null) return;
 
         try {
-            MinecraftAccountsState state = MinecraftAccountsState.getInstance();
-            MinecraftAccount acc = state.accounts.stream()
-                    .filter(a -> a.id.equals(state.selectedAccountId))
-                    .findFirst()
-                    .orElse(null);
-
+            MinecraftAccount acc = selectedAccount();
             if (acc == null) return;
 
             RunManager runManager = RunManager.getInstance(project);
@@ -91,6 +104,17 @@ public class MinecraftRunConfigUpdater {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /** Finds the "Minecraft Client" run configuration settings, or null if it doesn't exist yet. */
+    public static RunnerAndConfigurationSettings findClientSettings(Project project) {
+        if (project == null) return null;
+        for (RunnerAndConfigurationSettings settings : RunManager.getInstance(project).getAllSettings()) {
+            if (configName.equals(settings.getConfiguration().getName())) {
+                return settings;
+            }
+        }
+        return null;
     }
 
     /** Walks the class hierarchy to find a method by name and parameter types. */

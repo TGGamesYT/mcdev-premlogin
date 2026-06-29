@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'dev.tggamesyt'
-version '1.7'
+version '1.8'
 
 repositories {
     mavenCentral()
@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.7: Updated icon")
+        changeNotes.set("1.8: Added a player-head Launch button next to the Run button that starts the Minecraft client as the selected account, a first-launch login popup (Microsoft QR/link or offline username) when no account is set up, more reliable account activation when a project opens, and fixed account avatars sometimes reverting to a default Steve head.")
     }
 
     buildPlugin {

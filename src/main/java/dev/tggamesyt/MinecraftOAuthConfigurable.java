@@ -63,34 +63,7 @@ public class MinecraftOAuthConfigurable implements Configurable {
     // ===== Add account =====
 
     private void showAddAccountMenu() {
-        int choice = Messages.showDialog(
-                project,
-                "What kind of account do you want to add?",
-                "Add Account",
-                new String[]{"Microsoft Account", "Cracked Account", "Cancel"},
-                0,
-                Messages.getQuestionIcon()
-        );
-
-        if (choice == 0) {
-            new MicrosoftLoginDialog(project, manager, this::rebuild).show();
-        } else if (choice == 1) {
-            addCrackedAccount();
-        }
-    }
-
-    private void addCrackedAccount() {
-        String username = Messages.showInputDialog(
-                project, "Cracked username:", "Add Cracked Account", Messages.getQuestionIcon());
-        if (username == null || username.isBlank()) return;
-
-        MinecraftAccount acc = new MinecraftAccount();
-        acc.type = MinecraftAccount.Type.CRACKED;
-        acc.username = username.trim();
-
-        state.accounts.add(acc);
-        state.selectedAccountId = acc.id;
-        rebuild();
+        AccountLoginFlow.addAccount(project, this::rebuild);
     }
 
     // ===== List rendering =====

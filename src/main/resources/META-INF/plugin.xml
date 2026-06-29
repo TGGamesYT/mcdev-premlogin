@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>dev.tggamesyt.mcdev-premlogin</id>
     <name>Minecraft OAuth</name>
-    <version>1.7</version>
+    <version>1.8</version>
     <vendor email="tg@tggamesyt.dev" url="https://tggamesyt.dev">TGdoesCode</vendor>
 
     <description><![CDATA[
@@ -34,5 +34,14 @@
                 class="dev.tggamesyt.MinecraftOAuthLoginAction"
                 text="Login to Minecraft"
                 description="Login with Microsoft for premium Minecraft"/>
+
+        <action id="LaunchMinecraftAction"
+                class="dev.tggamesyt.LaunchMinecraftAction"
+                icon="/icons/icon.png"
+                text="Launch Minecraft"
+                description="Launch the Minecraft Client run configuration as the selected account">
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="first"/>
+            <add-to-group group-id="ToolbarRunGroup" anchor="first"/>
+        </action>
     </actions>
 </idea-plugin>
