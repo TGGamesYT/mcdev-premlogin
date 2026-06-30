@@ -39,6 +39,16 @@ public final class PlayerHeadFetcher {
         return account == null ? null : cache.get(account.id + ":" + size);
     }
 
+    /** The default "Steve" head at the given size, if already fetched. */
+    public static ImageIcon getCachedSteve(int size) {
+        return cache.get("STEVE:" + size);
+    }
+
+    /** Fetches the default "Steve" head (used when no account is selected). */
+    public static void fetchSteve(int size, Consumer<ImageIcon> onLoaded) {
+        load("MHF_Steve", "STEVE:" + size, size, onLoaded);
+    }
+
     /**
      * Loads the head for the given account at the requested pixel size, invoking {@code onLoaded}
      * on the EDT once the image is available (immediately if already cached).
@@ -51,13 +61,16 @@ public final class PlayerHeadFetcher {
                 : account.username;
         if (idPart == null || idPart.isBlank()) return;
 
-        String key = account.id + ":" + size;
+        load(idPart, account.id + ":" + size, size, onLoaded);
+    }
+
+    private static void load(String idPart, String key, int size, Consumer<ImageIcon> onLoaded) {
         ImageIcon cached = cache.get(key);
         if (cached != null) {
             onLoaded.accept(cached);
             return;
         }
-        // Avoid launching duplicate requests for the same account/size.
+        // Avoid launching duplicate requests for the same key.
         if (!inFlight.add(key)) return;
 
         ApplicationManager.getApplication().executeOnPooledThread(() -> {

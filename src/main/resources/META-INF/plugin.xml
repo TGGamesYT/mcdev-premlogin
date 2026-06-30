@@ -42,8 +42,10 @@
                 icon="/icons/icon.png"
                 text="Minecraft Accounts"
                 description="Open the Minecraft accounts manager">
-            <add-to-group group-id="RunToolbarMainActionGroup" anchor="first"/>
-            <add-to-group group-id="ToolbarRunGroup" anchor="first"/>
+            <!-- Sit beside the run widget in the new-UI main toolbar. Must NOT go inside
+                 RunToolbarMainActionGroup itself, which is a composite widget and breaks if
+                 arbitrary actions are injected into it. -->
+            <add-to-group group-id="MainToolbarRight" anchor="before" relative-to-action="RunToolbarMainActionGroup"/>
         </action>
     </actions>
 </idea-plugin>
