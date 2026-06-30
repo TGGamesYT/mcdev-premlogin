@@ -42,10 +42,11 @@
                 icon="/icons/icon.png"
                 text="Minecraft Accounts"
                 description="Open the Minecraft accounts manager">
-            <!-- Sit beside the run widget in the new-UI main toolbar. Must NOT go inside
-                 RunToolbarMainActionGroup itself, which is a composite widget and breaks if
-                 arbitrary actions are injected into it. -->
-            <add-to-group group-id="MainToolbarRight" anchor="before" relative-to-action="RunToolbarMainActionGroup"/>
+            <!-- Place it immediately to the left of the Run button, inside the new-UI run widget
+                 group. (Earlier "broken run controls" were actually the EDT freeze, not this
+                 placement.) Also add to the classic ToolbarRunGroup for the old UI. -->
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="before" relative-to-action="Run"/>
+            <add-to-group group-id="ToolbarRunGroup" anchor="before" relative-to-action="Run"/>
         </action>
     </actions>
 </idea-plugin>
