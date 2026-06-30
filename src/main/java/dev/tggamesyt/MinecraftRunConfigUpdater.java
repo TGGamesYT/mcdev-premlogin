@@ -19,6 +19,11 @@ public class MinecraftRunConfigUpdater {
 
     private static String configName = "Minecraft Client";
 
+    // Guards against infinite recursion: makeStable() fires runConfigurationChanged, which our
+    // RunManagerListener handles by calling updateArgs() again. Without this flag that would loop
+    // until a StackOverflowError froze the IDE.
+    private static volatile boolean updating = false;
+
     public static void setConfigName(String name) {
         configName = name;
     }
@@ -48,6 +53,8 @@ public class MinecraftRunConfigUpdater {
     public static void updateArgs() {
         Project project = MinecraftOAuthConfigurable.project;
         if (project == null) return;
+        if (updating) return; // re-entered via makeStable() -> runConfigurationChanged; skip
+        updating = true;
 
         try {
             MinecraftAccount acc = selectedAccount();
@@ -103,6 +110,8 @@ public class MinecraftRunConfigUpdater {
 
         } catch (Exception e) {
             e.printStackTrace();
+        } finally {
+            updating = false;
         }
     }
 
