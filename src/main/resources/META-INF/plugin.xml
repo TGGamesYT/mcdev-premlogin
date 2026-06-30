@@ -42,11 +42,11 @@
                 icon="/icons/icon.png"
                 text="Minecraft Accounts"
                 description="Open the Minecraft accounts manager">
-            <!-- Sit between the run-config dropdown and the Run button: anchor AFTER the config
-                 selector action (the dropdown is a real child action; Run/Debug are a nested
-                 composite that can't be anchored against directly). -->
-            <add-to-group group-id="RunToolbarMainActionGroup" anchor="after" relative-to-action="RunConfigurationsComboBoxAction"/>
-            <add-to-group group-id="ToolbarRunGroup" anchor="after" relative-to-action="RunConfigurationsComboBoxAction"/>
+            <!-- Place it at the start of the run-controls group (left of the config dropdown / Run
+                 button). The new-UI run widget renders Run/Debug as an internal composite, so
+                 anchoring "before Run" doesn't resolve; "first" is the reliable left-most spot. -->
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="first"/>
+            <add-to-group group-id="ToolbarRunGroup" anchor="first"/>
         </action>
     </actions>
 </idea-plugin>
