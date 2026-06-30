@@ -27,6 +27,8 @@
                 serviceImplementation="dev.tggamesyt.MinecraftAccountsState"/>
         <postStartupActivity
                 implementation="dev.tggamesyt.MinecraftProjectStartupActivity"/>
+        <stepsBeforeRunProvider
+                implementation="dev.tggamesyt.MinecraftBeforeRunTaskProvider"/>
     </extensions>
 
     <actions>
@@ -35,11 +37,11 @@
                 text="Login to Minecraft"
                 description="Login with Microsoft for premium Minecraft"/>
 
-        <action id="LaunchMinecraftAction"
-                class="dev.tggamesyt.LaunchMinecraftAction"
+        <action id="MinecraftAccountsToolbarAction"
+                class="dev.tggamesyt.MinecraftAccountsToolbarAction"
                 icon="/icons/icon.png"
-                text="Launch Minecraft"
-                description="Launch the Minecraft Client run configuration as the selected account">
+                text="Minecraft Accounts"
+                description="Open the Minecraft accounts manager">
             <add-to-group group-id="RunToolbarMainActionGroup" anchor="first"/>
             <add-to-group group-id="ToolbarRunGroup" anchor="first"/>
         </action>

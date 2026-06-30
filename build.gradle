@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.8: Added a player-head Launch button next to the Run button that starts the Minecraft client as the selected account, a first-launch login popup (Microsoft QR/link or offline username) when no account is set up, more reliable account activation when a project opens, and fixed account avatars sometimes reverting to a default Steve head.")
+        changeNotes.set("1.8: Added a player-head button next to the Run button that opens the Minecraft accounts manager as a popup, a login prompt that intercepts the actual Run button when no account is set up (offering Microsoft QR/link or an offline username), more reliable account activation when a project opens, and fixed account avatars sometimes reverting to a default Steve head.")
     }
 
     buildPlugin {

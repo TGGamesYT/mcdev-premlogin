@@ -11,11 +11,11 @@ import java.awt.Image;
 import java.awt.image.BufferedImage;
 
 /**
- * Toolbar button shown next to the Run button. Its icon is the selected account's player head, and
- * clicking it launches the Minecraft Client run configuration as that account (prompting for login
- * first if no account is configured).
+ * Toolbar button shown next to the Run button. Its icon is the selected account's player head.
+ * Clicking it opens the Minecraft Accounts popup — the same account list / add-account UI that
+ * lives in Settings → Minecraft Accounts.
  */
-public class LaunchMinecraftAction extends AnAction {
+public class MinecraftAccountsToolbarAction extends AnAction {
 
     private static final int ICON_SIZE = 16;
     private static final Icon PLACEHOLDER = loadPlaceholder();
@@ -23,7 +23,7 @@ public class LaunchMinecraftAction extends AnAction {
     /** The plugin icon scaled to a 16×16 toolbar icon (or a blank icon if it can't be loaded). */
     private static Icon loadPlaceholder() {
         try {
-            BufferedImage img = ImageIO.read(LaunchMinecraftAction.class.getResource("/icons/icon.png"));
+            BufferedImage img = ImageIO.read(MinecraftAccountsToolbarAction.class.getResource("/icons/icon.png"));
             if (img != null) {
                 Image scaled = img.getScaledInstance(ICON_SIZE, ICON_SIZE, Image.SCALE_SMOOTH);
                 return new ImageIcon(scaled);
@@ -41,25 +41,24 @@ public class LaunchMinecraftAction extends AnAction {
     @Override
     public void update(AnActionEvent e) {
         Project project = e.getProject();
-        // Only meaningful inside a project (where a Minecraft Client config can exist).
         e.getPresentation().setEnabledAndVisible(project != null);
         if (project == null) return;
 
         MinecraftAccount acc = MinecraftRunConfigUpdater.selectedAccount();
         if (acc == null) {
             e.getPresentation().setIcon(PLACEHOLDER);
-            e.getPresentation().setText("Launch Minecraft (set up an account)");
+            e.getPresentation().setText("Minecraft accounts (none set up)");
             return;
         }
 
         Icon head = PlayerHeadFetcher.getCached(acc, ICON_SIZE);
         if (head == null) {
-            // Kick off the fetch; the toolbar will pick up the icon on a later update tick.
+            // Kick off the fetch; the toolbar picks up the icon on a later update tick.
             PlayerHeadFetcher.fetch(acc, ICON_SIZE, icon -> {});
             head = PLACEHOLDER;
         }
         e.getPresentation().setIcon(head);
-        e.getPresentation().setText("Launch Minecraft as " + acc.username);
+        e.getPresentation().setText("Minecraft accounts (" + acc.username + ")");
     }
 
     @Override
@@ -67,6 +66,6 @@ public class LaunchMinecraftAction extends AnAction {
         Project project = e.getProject();
         if (project == null) return;
         MinecraftOAuthConfigurable.project = project;
-        MinecraftClientLauncher.launch(project);
+        new MinecraftAccountsDialog(project).show();
     }
 }
