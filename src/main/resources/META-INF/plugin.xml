@@ -42,11 +42,11 @@
                 icon="/icons/icon.png"
                 text="Minecraft Accounts"
                 description="Open the Minecraft accounts manager">
-            <!-- Place it immediately to the left of the Run button, inside the new-UI run widget
-                 group. (Earlier "broken run controls" were actually the EDT freeze, not this
-                 placement.) Also add to the classic ToolbarRunGroup for the old UI. -->
-            <add-to-group group-id="RunToolbarMainActionGroup" anchor="before" relative-to-action="Run"/>
-            <add-to-group group-id="ToolbarRunGroup" anchor="before" relative-to-action="Run"/>
+            <!-- Place it at the start of the run-controls group (left of the config dropdown / Run
+                 button). The new-UI run widget renders Run/Debug as an internal composite, so
+                 anchoring "before Run" doesn't resolve; "first" is the reliable left-most spot. -->
+            <add-to-group group-id="RunToolbarMainActionGroup" anchor="first"/>
+            <add-to-group group-id="ToolbarRunGroup" anchor="first"/>
         </action>
     </actions>
 </idea-plugin>
