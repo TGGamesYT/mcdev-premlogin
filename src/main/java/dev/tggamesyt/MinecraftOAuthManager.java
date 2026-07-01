@@ -13,6 +13,7 @@ import java.net.URI;
 import java.net.URLEncoder;
 import java.security.MessageDigest;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class MinecraftOAuthManager {
     public static boolean isClientIdGood = true;
@@ -31,7 +32,14 @@ public class MinecraftOAuthManager {
     private static final String LIVE_SCOPE = "service::user.auth.xboxlive.com::MBI_SSL";
     private static HttpServer callbackServer;
     private static boolean serverStarted = false;
-    private static final OkHttpClient client = new OkHttpClient();
+    // Timeouts so a slow/hung endpoint can't keep a silent refresh running indefinitely (which
+    // otherwise leaves the account stuck showing "Refreshing…").
+    private static final OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(15, TimeUnit.SECONDS)
+            .writeTimeout(15, TimeUnit.SECONDS)
+            .callTimeout(30, TimeUnit.SECONDS)
+            .build();
     public String getClientId() {
         if(isClientIdGood) {
             return  CLIENT_ID;

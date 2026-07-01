@@ -10,6 +10,7 @@ import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -29,9 +30,14 @@ public class MinecraftAccountsPanel implements Disposable {
     private final JPanel listPanel;
     private Timer refreshTimer;
 
+    // Don't retry a silent refresh more often than this per account (avoids hammering + a
+    // perpetual "Refreshing…" when a refresh keeps failing).
+    private static final long REFRESH_BACKOFF_MS = 2 * 60 * 1000;
+
     private final MinecraftOAuthManager manager = new MinecraftOAuthManager();
     private final MinecraftAccountsState state = MinecraftAccountsState.getInstance();
     private final Set<String> refreshingIds = ConcurrentHashMap.newKeySet();
+    private final Map<String, Long> lastRefreshAttempt = new ConcurrentHashMap<>();
 
     public MinecraftAccountsPanel(Project project) {
         this.project = project;
@@ -149,15 +155,27 @@ public class MinecraftAccountsPanel implements Disposable {
         if (acc.type == MinecraftAccount.Type.CRACKED) {
             return "Cracked (offline) account";
         }
+        // Only show "Refreshing…" while a refresh is genuinely in flight.
+        if (refreshingIds.contains(acc.id)) return "Refreshing…";
+
         if (acc.isExpired()) {
-            if (refreshingIds.contains(acc.id)) return "Refreshing…";
             if (acc.canRefresh()) {
-                triggerSilentRefresh(acc);
-                return "Refreshing…";
+                // Kick off a quiet background refresh (rate-limited). Don't advertise "Refreshing…"
+                // here: the saved session usually still works, and if the refresh keeps failing we
+                // must not get stuck on that label forever.
+                maybeTriggerSilentRefresh(acc);
+                return "Microsoft account";
             }
             return "Session expired — re-login required";
         }
         return "Microsoft account";
+    }
+
+    /** Starts a silent refresh only if one isn't running and we haven't tried too recently. */
+    private void maybeTriggerSilentRefresh(MinecraftAccount acc) {
+        Long last = lastRefreshAttempt.get(acc.id);
+        if (last != null && System.currentTimeMillis() - last < REFRESH_BACKOFF_MS) return;
+        triggerSilentRefresh(acc);
     }
 
     private void showRowMenu(MinecraftAccount acc, Component anchor) {
@@ -191,10 +209,14 @@ public class MinecraftAccountsPanel implements Disposable {
 
     private void triggerSilentRefresh(MinecraftAccount acc) {
         if (!refreshingIds.add(acc.id)) return; // already in progress
+        lastRefreshAttempt.put(acc.id, System.currentTimeMillis());
         ApplicationManager.getApplication().executeOnPooledThread(() -> {
-            manager.refreshAccount(acc);
-            refreshingIds.remove(acc.id);
-            SwingUtilities.invokeLater(this::rebuild);
+            try {
+                manager.refreshAccount(acc);
+            } finally {
+                refreshingIds.remove(acc.id);
+                SwingUtilities.invokeLater(this::rebuild);
+            }
         });
     }
 

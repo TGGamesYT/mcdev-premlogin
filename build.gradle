@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'dev.tggamesyt'
-version '1.8'
+version '1.9'
 
 repositories {
     mavenCentral()
@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.8: Added a player-head button next to the Run button that opens the Minecraft accounts manager as a popup, a login prompt that intercepts the actual Run button when no account is set up, more reliable account activation when a project opens, and fixed account avatars sometimes reverting to a default Steve head.")
+        changeNotes.set("1.9: Fixed Microsoft accounts sometimes getting stuck showing \"Refreshing…\" even though the account still worked — the label now only shows during an actual refresh, silent refreshes are rate-limited instead of retrying every second, and the auth HTTP calls have timeouts so a slow server can't hang the refresh.")
     }
 
     buildPlugin {

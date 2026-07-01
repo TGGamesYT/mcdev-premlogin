@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>dev.tggamesyt.mcdev-premlogin</id>
     <name>Minecraft OAuth</name>
-    <version>1.8</version>
+    <version>1.9</version>
     <vendor email="tg@tggamesyt.dev" url="https://tggamesyt.dev">TGdoesCode</vendor>
 
     <description><![CDATA[
@@ -42,9 +42,8 @@
                 icon="/icons/icon.png"
                 text="Minecraft Accounts"
                 description="Open the Minecraft accounts manager">
-            <!-- Place it at the start of the run-controls group (left of the config dropdown / Run
-                 button). The new-UI run widget renders Run/Debug as an internal composite, so
-                 anchoring "before Run" doesn't resolve; "first" is the reliable left-most spot. -->
+            <!-- Left-most spot in the run-controls group. (Anchoring precisely between the dropdown
+                 and Run isn't reliably supported in the new-UI composite run widget.) -->
             <add-to-group group-id="RunToolbarMainActionGroup" anchor="first"/>
             <add-to-group group-id="ToolbarRunGroup" anchor="first"/>
         </action>
