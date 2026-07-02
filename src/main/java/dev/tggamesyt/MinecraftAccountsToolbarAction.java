@@ -32,8 +32,10 @@ public class MinecraftAccountsToolbarAction extends AnAction {
     @Override
     public void update(AnActionEvent e) {
         Project project = e.getProject();
-        e.getPresentation().setEnabledAndVisible(project != null);
-        if (project == null) return;
+        // Only show in Minecraft Dev projects, i.e. when a "Minecraft Client" run config exists.
+        boolean visible = project != null && MinecraftRunConfigUpdater.findClientSettings(project) != null;
+        e.getPresentation().setEnabledAndVisible(visible);
+        if (!visible) return;
 
         // Preload every account's head so switching between them is instant (cached calls are cheap).
         for (MinecraftAccount a : MinecraftAccountsState.getInstance().accounts) {
