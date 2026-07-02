@@ -20,6 +20,10 @@ public class MinecraftAccountsToolbarAction extends AnAction {
     // Neutral placeholder shown only until the real head/Steve image has been downloaded.
     private static final Icon LOADING = makeLoadingIcon();
 
+    // Last real head we displayed. Shown while a newly-selected account's head is still loading so
+    // the icon doesn't flash back to Steve when switching accounts.
+    private Icon lastHead;
+
     @Override
     public ActionUpdateThread getActionUpdateThread() {
         return ActionUpdateThread.EDT;
@@ -31,6 +35,13 @@ public class MinecraftAccountsToolbarAction extends AnAction {
         e.getPresentation().setEnabledAndVisible(project != null);
         if (project == null) return;
 
+        // Preload every account's head so switching between them is instant (cached calls are cheap).
+        for (MinecraftAccount a : MinecraftAccountsState.getInstance().accounts) {
+            if (PlayerHeadFetcher.getCached(a, ICON_SIZE) == null) {
+                PlayerHeadFetcher.fetch(a, ICON_SIZE, icon -> {});
+            }
+        }
+
         MinecraftAccount acc = MinecraftRunConfigUpdater.selectedAccount();
         if (acc == null) {
             e.getPresentation().setIcon(steveIcon());
@@ -39,11 +50,13 @@ public class MinecraftAccountsToolbarAction extends AnAction {
         }
 
         Icon head = PlayerHeadFetcher.getCached(acc, ICON_SIZE);
-        if (head == null) {
-            // Kick off the fetch; the toolbar picks up the icon on a later update tick. Show Steve
-            // (or a neutral placeholder) meanwhile.
+        if (head != null) {
+            lastHead = head;
+        } else {
+            // Not loaded yet: kick off the fetch and keep showing the previous head (falling back to
+            // Steve only if we've never shown one) so it never flashes to Steve mid-switch.
             PlayerHeadFetcher.fetch(acc, ICON_SIZE, icon -> {});
-            head = steveIcon();
+            head = lastHead != null ? lastHead : steveIcon();
         }
         e.getPresentation().setIcon(head);
         e.getPresentation().setText("Minecraft accounts (" + acc.username + ")");
