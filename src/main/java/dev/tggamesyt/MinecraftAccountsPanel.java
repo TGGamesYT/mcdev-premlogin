@@ -1,5 +1,8 @@
 package dev.tggamesyt;
 
+import com.intellij.execution.ProgramRunnerUtil;
+import com.intellij.execution.RunnerAndConfigurationSettings;
+import com.intellij.execution.executors.DefaultRunExecutor;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
@@ -54,8 +57,13 @@ public class MinecraftAccountsPanel implements Disposable {
 
         JButton addButton = new JButton("Add Account");
         addButton.addActionListener(e -> AccountLoginFlow.addAccount(project, this::rebuild));
+
+        JButton runButton = new JButton("Run Minecraft Client");
+        runButton.addActionListener(e -> runClient());
+
         JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT));
         south.add(addButton);
+        south.add(runButton);
 
         panel.add(scroll, BorderLayout.CENTER);
         panel.add(south, BorderLayout.SOUTH);
@@ -70,6 +78,26 @@ public class MinecraftAccountsPanel implements Disposable {
 
     public JComponent getComponent() {
         return panel;
+    }
+
+    /** Launches the "Minecraft Client" run configuration as the selected account. */
+    private void runClient() {
+        if (project == null) return;
+        MinecraftOAuthConfigurable.project = project;
+
+        RunnerAndConfigurationSettings settings = MinecraftRunConfigUpdater.findClientSettings(project);
+        if (settings == null) {
+            Messages.showWarningDialog(
+                    project,
+                    "Couldn't find a \"" + MinecraftRunConfigUpdater.getConfigName() + "\" run configuration.\n"
+                            + "Open a Minecraft Development project and let it generate the run configurations first.",
+                    "Run Minecraft Client");
+            return;
+        }
+        // Write the selected account's login args now; the config's before-run hook additionally
+        // refreshes an expired token and prompts for login if no account is set up.
+        MinecraftRunConfigUpdater.updateArgs();
+        ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance());
     }
 
     // ===== List rendering =====

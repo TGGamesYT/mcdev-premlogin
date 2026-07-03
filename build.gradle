@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'dev.tggamesyt'
-version '2.0'
+version '1.10'
 
 repositories {
     mavenCentral()
@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("2.0: The account toolbar button now only appears in Minecraft Development projects (when a \"Minecraft Client\" run configuration exists), instead of on every project.")
+        changeNotes.set("1.10: The account toolbar button now only appears in Minecraft Development projects (when a \"Minecraft Client\" run configuration exists) instead of on every project, and the Minecraft Accounts settings tab has a \"Run Minecraft Client\" button that launches the game logged in as the selected account.")
     }
 
     buildPlugin {
