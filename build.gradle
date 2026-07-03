@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.10: The account toolbar button now only appears in Minecraft Development projects (when a \"Minecraft Client\" run configuration exists) instead of on every project, and the Minecraft Accounts settings tab has a \"Run Minecraft Client\" button that launches the game logged in as the selected account.")
+        changeNotes.set("1.10: The account toolbar button now only appears in Minecraft Development projects (when a \"Minecraft Client\" run configuration exists) instead of on every project. The Minecraft Accounts settings tab also gained a fallback \"Run Minecraft (gradle runClient)\" button that runs the Gradle runClient task directly with the selected account's login args — shown only when the project actually has a runClient task, and only in Settings (not the toolbar head popup).")
     }
 
     buildPlugin {

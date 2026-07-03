@@ -1,8 +1,5 @@
 package dev.tggamesyt;
 
-import com.intellij.execution.ProgramRunnerUtil;
-import com.intellij.execution.RunnerAndConfigurationSettings;
-import com.intellij.execution.executors.DefaultRunExecutor;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
@@ -42,7 +39,7 @@ public class MinecraftAccountsPanel implements Disposable {
     private final Set<String> refreshingIds = ConcurrentHashMap.newKeySet();
     private final Map<String, Long> lastRefreshAttempt = new ConcurrentHashMap<>();
 
-    public MinecraftAccountsPanel(Project project) {
+    public MinecraftAccountsPanel(Project project, boolean showRunButton) {
         this.project = project;
 
         panel = new JPanel(new BorderLayout(0, 8));
@@ -58,12 +55,16 @@ public class MinecraftAccountsPanel implements Disposable {
         JButton addButton = new JButton("Add Account");
         addButton.addActionListener(e -> AccountLoginFlow.addAccount(project, this::rebuild));
 
-        JButton runButton = new JButton("Run Minecraft Client");
-        runButton.addActionListener(e -> runClient());
-
         JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT));
         south.add(addButton);
-        south.add(runButton);
+
+        // Fallback launcher (Settings only): run the Gradle "runClient" task directly, logged in.
+        // Shown only when the project actually exposes that task.
+        if (showRunButton && GradleRunClient.isAvailable(project)) {
+            JButton runButton = new JButton("Run Minecraft (gradle runClient)");
+            runButton.addActionListener(e -> runClient());
+            south.add(runButton);
+        }
 
         panel.add(scroll, BorderLayout.CENTER);
         panel.add(south, BorderLayout.SOUTH);
@@ -80,24 +81,20 @@ public class MinecraftAccountsPanel implements Disposable {
         return panel;
     }
 
-    /** Launches the "Minecraft Client" run configuration as the selected account. */
+    /**
+     * Fallback launcher: runs the Gradle {@code runClient} task directly (not the Minecraft Dev run
+     * configuration), passing the selected account's login args. Refreshes an expired token first.
+     */
     private void runClient() {
         if (project == null) return;
-        MinecraftOAuthConfigurable.project = project;
-
-        RunnerAndConfigurationSettings settings = MinecraftRunConfigUpdater.findClientSettings(project);
-        if (settings == null) {
-            Messages.showWarningDialog(
-                    project,
-                    "Couldn't find a \"" + MinecraftRunConfigUpdater.getConfigName() + "\" run configuration.\n"
-                            + "Open a Minecraft Development project and let it generate the run configurations first.",
-                    "Run Minecraft Client");
-            return;
-        }
-        // Write the selected account's login args now; the config's before-run hook additionally
-        // refreshes an expired token and prompts for login if no account is set up.
-        MinecraftRunConfigUpdater.updateArgs();
-        ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance());
+        MinecraftAccount acc = MinecraftRunConfigUpdater.selectedAccount();
+        ApplicationManager.getApplication().executeOnPooledThread(() -> {
+            if (acc != null && acc.isExpired() && acc.canRefresh()
+                    && MinecraftOAuthManager.areAuthServersUp()) {
+                manager.refreshAccount(acc);
+            }
+            ApplicationManager.getApplication().invokeLater(() -> GradleRunClient.run(project, acc));
+        });
     }
 
     // ===== List rendering =====

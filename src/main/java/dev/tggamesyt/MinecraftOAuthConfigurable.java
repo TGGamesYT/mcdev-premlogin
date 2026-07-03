@@ -28,7 +28,7 @@ public class MinecraftOAuthConfigurable implements Configurable {
     @Nullable
     @Override
     public JComponent createComponent() {
-        accountsPanel = new MinecraftAccountsPanel(project);
+        accountsPanel = new MinecraftAccountsPanel(project, true);
         return accountsPanel.getComponent();
     }
 

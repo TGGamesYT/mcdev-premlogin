@@ -16,7 +16,7 @@ public class MinecraftAccountsDialog extends DialogWrapper {
 
     public MinecraftAccountsDialog(@Nullable Project project) {
         super(project);
-        accountsPanel = new MinecraftAccountsPanel(project);
+        accountsPanel = new MinecraftAccountsPanel(project, false);
         setTitle("Minecraft Accounts");
         init();
     }
