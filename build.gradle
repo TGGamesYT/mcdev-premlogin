@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'dev.tggamesyt'
-version '1.10'
+version '1.11'
 
 repositories {
     mavenCentral()
@@ -55,7 +55,7 @@ tasks.test {
 }
 tasks {
     patchPluginXml {
-        changeNotes.set("1.10: The account toolbar button now only appears in Minecraft Development projects (when a \"Minecraft Client\" run configuration exists) instead of on every project. The Minecraft Accounts settings tab also gained a fallback \"Run Minecraft (gradle runClient)\" button that runs the Gradle runClient task directly with the selected account's login args — shown only when the project actually has a runClient task, and only in Settings (not the toolbar head popup).")
+        changeNotes.set("1.11: Fixed the selected account not being applied on the newest Minecraft Dev + Minecraft versions, where the generated \"Minecraft Client\" run config is a Gradle run configuration (the login args are now passed to the Gradle runClient task via --args, in addition to the existing program-parameters path for Forge/NeoForge). Also added project-import hooks: opening or cloning a Minecraft project without importing Gradle now triggers the Gradle link so Minecraft Dev detects it and the project is treated like a normal Minecraft Dev project.")
     }
 
     buildPlugin {

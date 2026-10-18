@@ -41,7 +41,7 @@ public class MinecraftBeforeRunTaskProvider extends BeforeRunTaskProvider<Minecr
     @Nullable
     @Override
     public MinecraftBeforeRunTask createTask(RunConfiguration runConfiguration) {
-        if (!MinecraftRunConfigUpdater.getConfigName().equals(runConfiguration.getName())) {
+        if (!MinecraftRunConfigUpdater.isClientConfigName(runConfiguration.getName())) {
             return null;
         }
         MinecraftBeforeRunTask task = new MinecraftBeforeRunTask();
