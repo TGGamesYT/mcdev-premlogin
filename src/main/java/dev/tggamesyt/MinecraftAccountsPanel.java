@@ -3,6 +3,7 @@ package dev.tggamesyt;
 import com.intellij.openapi.Disposable;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.DialogWrapper;
 import com.intellij.openapi.ui.Messages;
 
 import javax.swing.*;
@@ -133,8 +134,21 @@ public class MinecraftAccountsPanel implements Disposable {
     private JComponent buildArgsInfoButton() {
         JButton info = new JButton(MinecraftArgs.PLACEHOLDER + " ?");
         info.setToolTipText("What is " + MinecraftArgs.PLACEHOLDER + "?");
-        info.addActionListener(e -> Messages.showInfoMessage(project,
-                "<html><div style='width:420px;'>"
+        info.addActionListener(e -> showArgsInfoDialog());
+        return info;
+    }
+
+    /** Shows the placeholder explanation at its natural size (no scroll area). */
+    private void showArgsInfoDialog() {
+        DialogWrapper dialog = new DialogWrapper(project, false) {
+            {
+                setTitle(MinecraftArgs.PLACEHOLDER);
+                init();
+            }
+
+            @Override
+            protected JComponent createCenterPanel() {
+                JLabel label = new JLabel("<html><div style='width:420px;'>"
                         + "Add <b>" + MinecraftArgs.PLACEHOLDER + "</b> to any run configuration field "
                         + "or command (program arguments, VM arguments, Gradle task arguments, …). "
                         + "When it runs, it is replaced with the selected account's login arguments "
@@ -148,9 +162,17 @@ public class MinecraftAccountsPanel implements Disposable {
                         + "script in your Gradle user home and writes the current login args (incl. "
                         + "the access token) to an owner-only file there. Java-based run "
                         + "configurations work without it."
-                        + "</div></html>",
-                MinecraftArgs.PLACEHOLDER));
-        return info;
+                        + "</div></html>");
+                label.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+                return label;
+            }
+
+            @Override
+            protected Action[] createActions() {
+                return new Action[]{getOKAction()};
+            }
+        };
+        dialog.show();
     }
 
     /**
