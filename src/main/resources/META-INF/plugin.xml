@@ -29,6 +29,8 @@
                 implementation="dev.tggamesyt.MinecraftProjectStartupActivity"/>
         <stepsBeforeRunProvider
                 implementation="dev.tggamesyt.MinecraftBeforeRunTaskProvider"/>
+        <runConfigurationExtension
+                implementation="dev.tggamesyt.MinecraftArgsRunConfigExtension"/>
     </extensions>
 
     <actions>

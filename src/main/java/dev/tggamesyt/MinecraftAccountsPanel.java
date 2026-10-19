@@ -52,6 +52,11 @@ public class MinecraftAccountsPanel implements Disposable {
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getVerticalScrollBar().setUnitIncrement(16);
 
+        // Settings-only header: the "mark as Minecraft project" toggle + placeholder help text.
+        if (showRunButton) {
+            panel.add(buildSettingsHeader(), BorderLayout.NORTH);
+        }
+
         JButton addButton = new JButton("Add Account");
         addButton.addActionListener(e -> AccountLoginFlow.addAccount(project, this::rebuild));
 
@@ -79,6 +84,40 @@ public class MinecraftAccountsPanel implements Disposable {
 
     public JComponent getComponent() {
         return panel;
+    }
+
+    /**
+     * Builds the Settings header: the "Mark this project as a Minecraft project" toggle and the
+     * explanation of the {@code --minecraftArgsHere} placeholder.
+     */
+    private JComponent buildSettingsHeader() {
+        JPanel header = new JPanel();
+        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
+        header.setBorder(BorderFactory.createEmptyBorder(4, 4, 8, 4));
+
+        JCheckBox mark = new JCheckBox("Mark this project as a Minecraft project");
+        mark.setAlignmentX(Component.LEFT_ALIGNMENT);
+        mark.setToolTipText("Shows the account head button next to the run configurations even when "
+                + "no Minecraft Client run configuration is detected.");
+        mark.setEnabled(project != null);
+        mark.setSelected(project != null && MinecraftProjectDetector.isMarked(project));
+        mark.addActionListener(e -> MinecraftProjectDetector.setMarked(project, mark.isSelected()));
+        header.add(mark);
+
+        JLabel help = new JLabel("<html><div style='width:380px; padding-top:4px;'>"
+                + "Add <b>" + MinecraftArgs.PLACEHOLDER + "</b> to any run configuration field or "
+                + "command (program arguments, VM arguments, Gradle task arguments, …). When it runs, "
+                + "it is replaced with the selected account's login arguments "
+                + "(<code>--username … --uuid … --accessToken … --userType msa</code>). The real token "
+                + "is only used for that run and never saved back into the configuration.<br><br>"
+                + "For a Gradle <b>runClient</b> task, use: "
+                + "<code>--args=\"" + MinecraftArgs.PLACEHOLDER + "\"</code>"
+                + "</div></html>");
+        help.setAlignmentX(Component.LEFT_ALIGNMENT);
+        help.setForeground(UIManager.getColor("Label.disabledForeground"));
+        header.add(help);
+
+        return header;
     }
 
     /**

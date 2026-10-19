@@ -1,5 +1,6 @@
 package dev.tggamesyt;
 
+import com.intellij.ide.util.PropertiesComponent;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectUtil;
@@ -25,6 +26,28 @@ import java.util.Locale;
 public final class MinecraftProjectDetector {
 
     private MinecraftProjectDetector() {}
+
+    // Persisted per-project flag for the "Mark this project as a Minecraft project" setting.
+    private static final String MARK_KEY = "dev.tggamesyt.mcdev-premlogin.markedMinecraftProject";
+
+    /** Whether the user manually marked this project as a Minecraft project in settings. */
+    public static boolean isMarked(Project project) {
+        if (project == null) return false;
+        try {
+            return PropertiesComponent.getInstance(project).getBoolean(MARK_KEY, false);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** Sets (or clears) the manual "this is a Minecraft project" mark for a project. */
+    public static void setMarked(Project project, boolean marked) {
+        if (project == null) return;
+        try {
+            PropertiesComponent.getInstance(project).setValue(MARK_KEY, marked);
+        } catch (Throwable ignored) {
+        }
+    }
 
     // Resource/marker files that identify a Minecraft project regardless of build-system import state.
     private static final String[] MARKER_FILES = {
