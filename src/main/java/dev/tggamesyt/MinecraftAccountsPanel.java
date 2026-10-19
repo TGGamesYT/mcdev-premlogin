@@ -52,11 +52,6 @@ public class MinecraftAccountsPanel implements Disposable {
         scroll.setBorder(BorderFactory.createEmptyBorder());
         scroll.getVerticalScrollBar().setUnitIncrement(16);
 
-        // Settings-only header: the "mark as Minecraft project" toggle + placeholder help text.
-        if (showRunButton) {
-            panel.add(buildSettingsHeader(), BorderLayout.NORTH);
-        }
-
         JButton addButton = new JButton("Add Account");
         addButton.addActionListener(e -> AccountLoginFlow.addAccount(project, this::rebuild));
 
@@ -69,6 +64,13 @@ public class MinecraftAccountsPanel implements Disposable {
             JButton runButton = new JButton("Run Minecraft (gradle runClient)");
             runButton.addActionListener(e -> runClient());
             south.add(runButton);
+        }
+
+        // Settings-only controls, in the same button row.
+        if (showRunButton) {
+            south.add(buildMarkToggle());
+            south.add(buildGradleSupportToggle());
+            south.add(buildArgsInfoButton());
         }
 
         panel.add(scroll, BorderLayout.CENTER);
@@ -87,37 +89,66 @@ public class MinecraftAccountsPanel implements Disposable {
     }
 
     /**
-     * Builds the Settings header: the "Mark this project as a Minecraft project" toggle and the
-     * explanation of the {@code --minecraftArgsHere} placeholder.
+     * "Mark this project as a Minecraft project" toggle. It reflects the current state (auto-detected
+     * or already shown) and lets the user force it on or off for this project.
      */
-    private JComponent buildSettingsHeader() {
-        JPanel header = new JPanel();
-        header.setLayout(new BoxLayout(header, BoxLayout.Y_AXIS));
-        header.setBorder(BorderFactory.createEmptyBorder(4, 4, 8, 4));
-
-        JCheckBox mark = new JCheckBox("Mark this project as a Minecraft project");
-        mark.setAlignmentX(Component.LEFT_ALIGNMENT);
-        mark.setToolTipText("Shows the account head button next to the run configurations even when "
-                + "no Minecraft Client run configuration is detected.");
+    private JComponent buildMarkToggle() {
+        JCheckBox mark = new JCheckBox("Mark as Minecraft project");
+        mark.setToolTipText("Shows the account head button next to the run configurations. "
+                + "Reflects auto-detection; toggle to force it on or off for this project.");
         mark.setEnabled(project != null);
-        mark.setSelected(project != null && MinecraftProjectDetector.isMarked(project));
-        mark.addActionListener(e -> MinecraftProjectDetector.setMarked(project, mark.isSelected()));
-        header.add(mark);
+        mark.setSelected(MinecraftProjectDetector.shouldShowAccountButton(project));
+        mark.addActionListener(e -> MinecraftProjectDetector.setOverride(project, mark.isSelected()));
+        return mark;
+    }
 
-        JLabel help = new JLabel("<html><div style='width:380px; padding-top:4px;'>"
-                + "Add <b>" + MinecraftArgs.PLACEHOLDER + "</b> to any run configuration field or "
-                + "command (program arguments, VM arguments, Gradle task arguments, …). When it runs, "
-                + "it is replaced with the selected account's login arguments "
-                + "(<code>--username … --uuid … --accessToken … --userType msa</code>). The real token "
-                + "is only used for that run and never saved back into the configuration.<br><br>"
-                + "For a Gradle <b>runClient</b> task, use: "
-                + "<code>--args=\"" + MinecraftArgs.PLACEHOLDER + "\"</code>"
-                + "</div></html>");
-        help.setAlignmentX(Component.LEFT_ALIGNMENT);
-        help.setForeground(UIManager.getColor("Label.disabledForeground"));
-        header.add(help);
+    /**
+     * Toggle for the global Gradle init script that expands {@link MinecraftArgs#PLACEHOLDER} in
+     * Gradle run configurations and the terminal.
+     */
+    private JComponent buildGradleSupportToggle() {
+        JCheckBox toggle = new JCheckBox("Gradle/terminal support");
+        toggle.setToolTipText("Installs a global Gradle init script so " + MinecraftArgs.PLACEHOLDER
+                + " works in Gradle run configs and the terminal.");
+        toggle.setSelected(MinecraftGradleInitScript.isEnabled());
+        toggle.addActionListener(e -> {
+            if (toggle.isSelected()) {
+                boolean ok = MinecraftGradleInitScript.enable();
+                if (!ok) {
+                    toggle.setSelected(false);
+                    Messages.showErrorDialog(project,
+                            "Couldn't install the Gradle init script in your Gradle user home.",
+                            "Minecraft OAuth");
+                }
+            } else {
+                MinecraftGradleInitScript.disable();
+            }
+        });
+        return toggle;
+    }
 
-        return header;
+    /** A button that opens a popup explaining the {@code --minecraftArgsHere} placeholder. */
+    private JComponent buildArgsInfoButton() {
+        JButton info = new JButton(MinecraftArgs.PLACEHOLDER + " ?");
+        info.setToolTipText("What is " + MinecraftArgs.PLACEHOLDER + "?");
+        info.addActionListener(e -> Messages.showInfoMessage(project,
+                "<html><div style='width:420px;'>"
+                        + "Add <b>" + MinecraftArgs.PLACEHOLDER + "</b> to any run configuration field "
+                        + "or command (program arguments, VM arguments, Gradle task arguments, …). "
+                        + "When it runs, it is replaced with the selected account's login arguments "
+                        + "(<code>--username … --uuid … --accessToken … --userType msa</code>). "
+                        + "The real token is only used for that run and is never saved back into the "
+                        + "configuration.<br><br>"
+                        + "For a Gradle <b>runClient</b> task, use:<br>"
+                        + "<code>--args=\"" + MinecraftArgs.PLACEHOLDER + "\"</code><br><br>"
+                        + "To make it work in Gradle run configurations and the terminal, enable "
+                        + "<b>Gradle/terminal support</b> — that installs a small Gradle init "
+                        + "script in your Gradle user home and writes the current login args (incl. "
+                        + "the access token) to an owner-only file there. Java-based run "
+                        + "configurations work without it."
+                        + "</div></html>",
+                MinecraftArgs.PLACEHOLDER));
+        return info;
     }
 
     /**

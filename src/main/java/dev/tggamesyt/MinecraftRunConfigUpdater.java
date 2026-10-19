@@ -78,6 +78,9 @@ public class MinecraftRunConfigUpdater {
      * </ul>
      */
     public static void updateArgs() {
+        // Keep the global Gradle init-script args file current (no-op unless the user enabled it).
+        MinecraftGradleInitScript.refresh();
+
         Project project = MinecraftOAuthConfigurable.project;
         if (project == null) return;
         if (updating) return; // re-entered via makeStable() -> runConfigurationChanged; skip

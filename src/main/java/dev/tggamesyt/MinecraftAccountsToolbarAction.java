@@ -32,11 +32,9 @@ public class MinecraftAccountsToolbarAction extends AnAction {
     @Override
     public void update(AnActionEvent e) {
         Project project = e.getProject();
-        // Show in Minecraft Dev projects (a client run config exists) or when the user manually
-        // marked this project as a Minecraft project in settings.
-        boolean visible = project != null
-                && (MinecraftRunConfigUpdater.findClientSettings(project) != null
-                    || MinecraftProjectDetector.isMarked(project));
+        // Show in Minecraft projects (client run config or detected markers), subject to the user's
+        // explicit "Mark this project as a Minecraft project" override from settings.
+        boolean visible = MinecraftProjectDetector.shouldShowAccountButton(project);
         e.getPresentation().setEnabledAndVisible(visible);
         if (!visible) return;
 

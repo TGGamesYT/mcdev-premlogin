@@ -8,7 +8,10 @@ import com.intellij.openapi.vfs.VirtualFile;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Locale;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * Detects whether an opened/imported project is a Minecraft project directly from its files, and —
@@ -27,24 +30,53 @@ public final class MinecraftProjectDetector {
 
     private MinecraftProjectDetector() {}
 
-    // Persisted per-project flag for the "Mark this project as a Minecraft project" setting.
-    private static final String MARK_KEY = "dev.tggamesyt.mcdev-premlogin.markedMinecraftProject";
+    // Persisted per-project override for the "Mark this project as a Minecraft project" toggle:
+    // unset = follow auto-detection, "true" = force shown, "false" = force hidden.
+    private static final String OVERRIDE_KEY = "dev.tggamesyt.mcdev-premlogin.markOverride";
 
-    /** Whether the user manually marked this project as a Minecraft project in settings. */
-    public static boolean isMarked(Project project) {
+    // Cache of the (relatively expensive) file-based detection, so the toolbar's frequent update()
+    // doesn't re-read build scripts from disk each time.
+    private static final Map<Project, Boolean> fileDetectCache =
+            Collections.synchronizedMap(new WeakHashMap<>());
+
+    /**
+     * Whether the account head button should be shown for this project: the user's explicit
+     * override if set, otherwise whether the project is auto-detected as a Minecraft project.
+     */
+    public static boolean shouldShowAccountButton(Project project) {
         if (project == null) return false;
+        Boolean override = getOverride(project);
+        if (override != null) return override;
+        return isDetectedMinecraftProject(project);
+    }
+
+    /** True if the project looks like a Minecraft project (a client run config exists, or markers). */
+    public static boolean isDetectedMinecraftProject(Project project) {
+        if (project == null) return false;
+        if (MinecraftRunConfigUpdater.findClientSettings(project) != null) return true;
+        Boolean cached = fileDetectCache.get(project);
+        if (cached != null) return cached;
+        boolean detected = isMinecraftProject(project);
+        fileDetectCache.put(project, detected);
+        return detected;
+    }
+
+    /** The explicit show/hide override, or null when the toggle follows auto-detection. */
+    public static Boolean getOverride(Project project) {
+        if (project == null) return null;
         try {
-            return PropertiesComponent.getInstance(project).getBoolean(MARK_KEY, false);
+            String v = PropertiesComponent.getInstance(project).getValue(OVERRIDE_KEY);
+            return v == null ? null : Boolean.valueOf(v);
         } catch (Throwable t) {
-            return false;
+            return null;
         }
     }
 
-    /** Sets (or clears) the manual "this is a Minecraft project" mark for a project. */
-    public static void setMarked(Project project, boolean marked) {
+    /** Stores an explicit show/hide override for the account head button. */
+    public static void setOverride(Project project, boolean show) {
         if (project == null) return;
         try {
-            PropertiesComponent.getInstance(project).setValue(MARK_KEY, marked);
+            PropertiesComponent.getInstance(project).setValue(OVERRIDE_KEY, Boolean.toString(show));
         } catch (Throwable ignored) {
         }
     }

@@ -30,6 +30,10 @@ public class MinecraftArgsExecutionListener implements ExecutionListener {
 
     @Override
     public void processStartScheduled(@NotNull String executorId, @NotNull ExecutionEnvironment env) {
+        // When the global Gradle init script is enabled it handles Gradle runs (and the terminal),
+        // so we don't also touch the persisted settings here.
+        if (MinecraftGradleInitScript.isEnabled()) return;
+
         ExternalSystemTaskExecutionSettings settings = settingsOf(env);
         if (settings == null) return;
 

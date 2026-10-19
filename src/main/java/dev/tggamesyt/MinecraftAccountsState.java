@@ -20,6 +20,8 @@ public class MinecraftAccountsState implements PersistentStateComponent<Minecraf
     public String selectedAccountId;
     /** Optional custom Azure app (client) ID used for QR / device-code login. Blank = use the built-in default. */
     public String azureClientId;
+    /** Whether the global Gradle init script (for --minecraftArgsHere in the terminal/Gradle) is installed. */
+    public boolean gradleInitScriptEnabled;
 
     public static MinecraftAccountsState getInstance() {
         return ApplicationManager.getApplication()
@@ -37,6 +39,7 @@ public class MinecraftAccountsState implements PersistentStateComponent<Minecraf
         this.accounts = state.accounts;
         this.selectedAccountId = state.selectedAccountId;
         this.azureClientId = state.azureClientId;
+        this.gradleInitScriptEnabled = state.gradleInitScriptEnabled;
     }
     public void removeAccount(String accountId) {
         accounts.removeIf(a -> a.id.equals(accountId));
