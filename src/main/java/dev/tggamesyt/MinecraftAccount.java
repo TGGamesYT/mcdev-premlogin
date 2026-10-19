@@ -21,6 +21,13 @@ public class MinecraftAccount {
     public String msRefreshToken; // Microsoft refresh token; null for cracked
 
     /**
+     * Set when a silent refresh fails because the Microsoft refresh token itself is no longer valid
+     * (grant expired / revoked). Once true, the account can't be refreshed silently any more and the
+     * user must sign in again. Cleared on a successful (re-)login.
+     */
+    public boolean needsReLogin;
+
+    /**
      * Which OAuth flow produced this account, so silent refresh uses the right endpoint and Xbox
      * ticket prefix. "azure" = browser auth-code flow (login.microsoftonline.com, RpsTicket d=);
      * "live" = device-code/QR flow (login.live.com, RpsTicket t=). Defaults to azure for accounts
@@ -33,6 +40,6 @@ public class MinecraftAccount {
     }
 
     public boolean canRefresh() {
-        return type == Type.PREMIUM && msRefreshToken != null;
+        return type == Type.PREMIUM && msRefreshToken != null && !needsReLogin;
     }
 }

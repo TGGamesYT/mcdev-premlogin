@@ -43,7 +43,7 @@ public class MinecraftAccountsPanel implements Disposable {
         this.project = project;
 
         panel = new JPanel(new BorderLayout(0, 8));
-        panel.setPreferredSize(new Dimension(420, 320));
+        panel.setPreferredSize(new Dimension(560, 340));
 
         listPanel = new JPanel();
         listPanel.setLayout(new BoxLayout(listPanel, BoxLayout.Y_AXIS));
@@ -55,7 +55,9 @@ public class MinecraftAccountsPanel implements Disposable {
         JButton addButton = new JButton("Add Account");
         addButton.addActionListener(e -> AccountLoginFlow.addAccount(project, this::rebuild));
 
-        JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        // WrapLayout so the controls flow onto a second line when the panel is narrow, instead of
+        // being clipped at the right edge.
+        JPanel south = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 4));
         south.add(addButton);
 
         // Fallback launcher (Settings only): run the Gradle "runClient" task directly, logged in.
@@ -250,6 +252,8 @@ public class MinecraftAccountsPanel implements Disposable {
         if (acc.type == MinecraftAccount.Type.CRACKED) {
             return "Cracked (offline) account";
         }
+        // The stored session can no longer be refreshed silently — the user must sign in again.
+        if (acc.needsReLogin) return "Microsoft account (re-login needed)";
         // Only show "Refreshing…" while a refresh is genuinely in flight.
         if (refreshingIds.contains(acc.id)) return "Refreshing…";
 

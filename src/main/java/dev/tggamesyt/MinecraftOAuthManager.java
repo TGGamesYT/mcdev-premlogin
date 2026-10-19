@@ -497,10 +497,17 @@ public class MinecraftOAuthManager {
             account.uuid = mcSession.uuid;
             account.msRefreshToken = msResult.refreshToken;
             account.expiresAt = System.currentTimeMillis() + (24L * 60 * 60 * 1000);
+            account.needsReLogin = false;
             System.out.println("Token refreshed silently for: " + account.username);
             return true;
         } catch (Exception e) {
-            System.err.println("Silent token refresh failed for " + account.username + ": " + e.getMessage());
+            String msg = e.getMessage();
+            System.err.println("Silent token refresh failed for " + account.username + ": " + msg);
+            // The refresh token itself is dead (grant expired/revoked): stop retrying and flag that
+            // the user must sign in again. Transient failures (servers down, network) are left alone.
+            if (msg != null && msg.contains("invalid_grant")) {
+                account.needsReLogin = true;
+            }
             return false;
         }
     }
